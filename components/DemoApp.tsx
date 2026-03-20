@@ -49,7 +49,7 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
       items: [
         { type: 'item', label: 'Help Topics', action: () => alert('Help') },
         { type: 'separator' },
-        { type: 'item', label: 'About DemoApp', action: () => alert('Win95 Style Menu Bar!') },
+        { type: 'item', label: 'About DemoApp', action: () => alert('AmerOS Style Menu Bar!') },
       ],
     },
   ], [close]);

@@ -7,6 +7,7 @@ import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
 import WindowContextMenu from '@/components/WindowManager/WindowContextMenu';
+import SplashScreen from '@/components/WindowManager/SplashScreen';
 import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState, ApplicationRegistry } from '@/types/window';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -26,6 +27,7 @@ export default function WindowManager({
   const [nextZIndex, setNextZIndex] = useLocalStorage<number>('ameros-next-zindex', 1);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isSplashFinished, setIsSplashFinished] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     x: number;
@@ -261,9 +263,7 @@ export default function WindowManager({
   }, [windows, contextMenu.windowId]);
 
   return (
-    <div 
-      className="h-screen bg-teal-600 bg-[url('/win95.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative"
-    >
+    <div className="h-screen bg-teal-600 bg-[url('/ameros-bg.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative">
       {/* Render Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
@@ -300,10 +300,10 @@ export default function WindowManager({
       })}
 
       {/* Start Menu */}
-      <StartMenu 
-        isOpen={isStartMenuOpen} 
-        onClose={closeStartMenu} 
-        onOpenWindow={openWindow} 
+      <StartMenu
+        isOpen={isStartMenuOpen}
+        onClose={closeStartMenu}
+        onOpenWindow={openWindow}
         items={startMenuItems}
         applicationRegistry={applicationRegistry}
       />
@@ -337,6 +337,9 @@ export default function WindowManager({
 
       {/* Custom Content */}
       {children}
+
+      {/* Splash Screen Overlay */}
+      {(!mounted || !isSplashFinished) && <SplashScreen onFinish={() => setIsSplashFinished(true)} minDuration={1500} />}
     </div>
   );
 }
