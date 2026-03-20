@@ -5,6 +5,7 @@ import DemoApp from '@/components/DemoApp';
 import TextEditor from '@/components/TextEditor';
 import Calculator from '@/components/Calculator';
 import FileExplorer from '@/components/FileExplorer';
+import Settings from '@/components/WindowManager/Settings';
 import type { StartMenuItem } from '@/types/window';
 
 const componentRegistry = {
@@ -12,6 +13,7 @@ const componentRegistry = {
   TextEditor,
   Calculator,
   FileExplorer,
+  Settings,
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -68,8 +70,13 @@ const startMenuItems: StartMenuItem[] = [
   {
     icon: '⚙️',
     label: 'Settings',
-    action: () => {
-      console.log('Settings clicked');
+    windowConfig: {
+      title: 'Settings',
+      width: 600,
+      height: 500,
+      x: 100,
+      y: 50,
+      component: 'Settings',
     },
   },
   { type: 'separator' },
