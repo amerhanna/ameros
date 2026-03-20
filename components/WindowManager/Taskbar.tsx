@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import type { WindowState } from "./types/window"
+import type { WindowState } from '@/types/window';
 
 interface TaskbarProps {
   windows: WindowState[]
@@ -9,6 +9,7 @@ interface TaskbarProps {
   onWindowSelect: (id: string) => void
   onStartMenuToggle: () => void
   isStartMenuOpen: boolean
+  onContextMenu: (id: string, x: number, y: number) => void
 }
 
 export default function Taskbar({
@@ -17,6 +18,7 @@ export default function Taskbar({
   onWindowSelect,
   onStartMenuToggle,
   isStartMenuOpen,
+  onContextMenu,
 }: TaskbarProps) {
   return (
     <div className="absolute bottom-0 left-0 right-0 h-8 bg-gray-300 border-t-2 border-white flex items-center px-1 gap-1">
@@ -44,6 +46,10 @@ export default function Taskbar({
                 : "bg-gray-300 border border-gray-400 hover:bg-gray-200"
             }`}
             onClick={() => onWindowSelect(window.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenu(window.id, e.clientX, e.clientY);
+            }}
           >
             {window.title}
           </Button>

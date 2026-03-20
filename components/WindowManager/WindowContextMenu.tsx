@@ -32,6 +32,33 @@ export default function WindowContextMenu({
   onDismiss,
 }: WindowContextMenuProps) {
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const [adjustedPos, setAdjustedPos] = React.useState({ left: x, top: y });
+
+  // Adjust position to stay within screen boundaries
+  React.useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const padding = 4;
+
+      let newLeft = x;
+      let newTop = y;
+
+      if (x + rect.width > screenWidth - padding) {
+        newLeft = screenWidth - rect.width - padding;
+      }
+      if (y + rect.height > screenHeight - padding) {
+        newTop = screenHeight - rect.height - padding;
+      }
+
+      // Ensure it doesn't go off the left or top either
+      newLeft = Math.max(padding, newLeft);
+      newTop = Math.max(padding, newTop);
+
+      setAdjustedPos({ left: newLeft, top: newTop });
+    }
+  }, [x, y]);
 
   // Close menu when clicking outside
   React.useEffect(() => {
@@ -63,8 +90,8 @@ export default function WindowContextMenu({
       ref={menuRef}
       className="fixed z-[9999] bg-[#c0c0c0] border-2 border-white shadow-[2px_2px_5px_rgba(0,0,0,0.5)] py-1 min-w-[150px] select-none text-black"
       style={{
-        left: x,
-        top: y,
+        left: adjustedPos.left,
+        top: adjustedPos.top,
         borderTopColor: '#ffffff',
         borderLeftColor: '#ffffff',
         borderRightColor: '#808080',

@@ -3,7 +3,6 @@
 import type React from "react"
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import WindowContextMenu from './WindowContextMenu';
 
 interface WindowProps {
   id: string;
@@ -29,6 +28,7 @@ interface WindowProps {
   onMove?: (id: string, x: number, y: number) => void;
   onResize?: (id: string, width: number, height: number, x?: number, y?: number) => void;
   onBlur?: (id: string) => void;
+  onContextMenu?: (id: string, x: number, y: number) => void;
 }
 
 export default function Window({
@@ -55,6 +55,7 @@ export default function Window({
   onMove,
   onResize,
   onBlur,
+  onContextMenu,
 }: WindowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -62,8 +63,6 @@ export default function Window({
   const [resizeDir, setResizeDir] = useState<string | null>(null);
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
   const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const prevActiveRef = useRef(isActive);
 
   useEffect(() => {
@@ -147,11 +146,10 @@ export default function Window({
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      setContextMenuPos({ x: e.clientX, y: e.clientY });
-      setShowContextMenu(true);
+      onContextMenu?.(id, e.clientX, e.clientY);
       onFocus?.(id);
     },
-    [id, onFocus],
+    [id, onFocus, onContextMenu],
   );
 
   const handleIconClick = useCallback(
@@ -159,11 +157,10 @@ export default function Window({
       e.stopPropagation();
       const rect = e.currentTarget.getBoundingClientRect();
       // Position below the icon
-      setContextMenuPos({ x: rect.left, y: rect.bottom });
-      setShowContextMenu(true);
+      onContextMenu?.(id, rect.left, rect.bottom);
       onFocus?.(id);
     },
-    [id, onFocus],
+    [id, onFocus, onContextMenu],
   );
 
   const maximizedStyle = isMaximized
@@ -307,29 +304,6 @@ export default function Window({
       >
         {children}
       </div>
-
-      {showContextMenu && (
-        <WindowContextMenu
-          x={contextMenuPos.x}
-          y={contextMenuPos.y}
-          isMaximized={isMaximized}
-          isMinimized={isMinimized}
-          maximizable={maximizable}
-          onClose={() => onClose?.(id)}
-          onMinimize={() => onMinimize?.(id)}
-          onMaximize={() => !isMaximized && onMaximize?.(id)}
-          onRestore={() => isMaximized && onMaximize?.(id)} // isMaximized true means we want to restore
-          onMove={() => {
-            // Move: In Windows 95 this puts you in a keyboard move mode.
-            // For now, let's just trigger a focus and maybe we can implement more later.
-            onFocus?.(id);
-          }}
-          onResize={() => {
-            onFocus?.(id);
-          }}
-          onDismiss={() => setShowContextMenu(false)}
-        />
-      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
+import WindowContextMenu from '@/components/WindowManager/WindowContextMenu';
 import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState, ApplicationRegistry } from '@/types/window';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -25,6 +26,17 @@ export default function WindowManager({
   const [nextZIndex, setNextZIndex] = useLocalStorage<number>('ameros-next-zindex', 1);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    windowId: string | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    windowId: null,
+  });
 
   // Handle hydration mismatch by only rendering windows after mount
   useEffect(() => {
@@ -208,6 +220,23 @@ export default function WindowManager({
     setIsStartMenuOpen(false);
   }, []);
 
+  const openWindowMenu = useCallback((id: string, x: number, y: number) => {
+    setContextMenu({
+      isOpen: true,
+      x,
+      y,
+      windowId: id,
+    });
+  }, []);
+
+  const closeWindowMenu = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const selectedWindow = useMemo(() => {
+    return windows.find((w) => w.id === contextMenu.windowId);
+  }, [windows, contextMenu.windowId]);
+
   return (
     <div 
       className="h-screen bg-teal-600 bg-[url('/win95.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative"
@@ -239,6 +268,7 @@ export default function WindowManager({
             onFocus={focusWindow}
             onMove={moveWindow}
             onResize={resizeWindow}
+            onContextMenu={openWindowMenu}
           >
             <WindowComponent {...window.props} />
           </Window>
@@ -261,7 +291,25 @@ export default function WindowManager({
         onWindowSelect={handleTaskbarWindowSelect}
         onStartMenuToggle={toggleStartMenu}
         isStartMenuOpen={isStartMenuOpen}
+        onContextMenu={openWindowMenu}
       />
+
+      {contextMenu.isOpen && selectedWindow && (
+        <WindowContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          isMaximized={!!selectedWindow.isMaximized}
+          isMinimized={!!selectedWindow.isMinimized}
+          maximizable={!!selectedWindow.maximizable}
+          onClose={() => closeWindow(selectedWindow.id)}
+          onMinimize={() => minimizeWindow(selectedWindow.id)}
+          onMaximize={() => !selectedWindow.isMaximized && maximizeWindow(selectedWindow.id)}
+          onRestore={() => selectedWindow.isMaximized && maximizeWindow(selectedWindow.id)}
+          onMove={() => focusWindow(selectedWindow.id)}
+          onResize={() => focusWindow(selectedWindow.id)}
+          onDismiss={closeWindowMenu}
+        />
+      )}
 
       {/* Custom Content */}
       {children}
