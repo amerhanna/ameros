@@ -2,21 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import { useWindow } from '@/hooks/useWindow';
+import { useMessageBox } from '@/hooks/useMessageBox';
 import { Button } from '@/components/ui/button';
 
 export default function TestCloseApp() {
   const { setBeforeClose } = useWindow();
+  const { showMessageBox } = useMessageBox();
   const [shouldPreventClose, setShouldPreventClose] = useState(true);
 
   useEffect(() => {
     if (shouldPreventClose) {
-      setBeforeClose(() => {
-        return confirm('Hook: Do you really want to close this window?');
-      });
+      setBeforeClose(() =>
+        showMessageBox(
+          'Close window',
+          'Do you really want to close this window?',
+          true,
+          ['Yes', 'No'],
+        ).then((choice) => choice === 'Yes'),
+      );
     } else {
       setBeforeClose(undefined);
     }
-  }, [shouldPreventClose, setBeforeClose]);
+  }, [shouldPreventClose, setBeforeClose, showMessageBox]);
 
   return (
     <div className="p-4">
@@ -32,9 +39,9 @@ export default function TestCloseApp() {
           <label htmlFor="preventClose">Enable beforeClose via Hook</label>
         </div>
         <p className="text-sm text-gray-600">
-          When enabled, trying to close this window will trigger a confirmation dialog.
+          When enabled, trying to close this window opens a Win95-style confirmation dialog.
         </p>
-        <Button onClick={() => window.alert('Still here!')}>
+        <Button onClick={() => void showMessageBox('TestCloseApp', 'Still here!', true)}>
           Interact with App
         </Button>
       </div>

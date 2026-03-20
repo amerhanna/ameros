@@ -36,7 +36,7 @@ interface WindowProps {
   onResize?: (id: string, width: number, height: number, x?: number, y?: number) => void;
   onBlur?: (id: string) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
-  setBeforeClose?: (fn: (() => boolean) | undefined) => void;
+  setBeforeClose?: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
   launchApp?: (component: string, config?: Partial<WindowConfig>) => string | null;
   openChildWindow?: (config: ChildWindowConfig) => string | null;
 }
@@ -125,7 +125,7 @@ export default function Window({
       launchArgs,
       menuBar,
       setMenuBar,
-      setBeforeClose: (fn: (() => boolean) | undefined) => {
+      setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => {
         setBeforeClose?.(fn);
       },
       launchApp: (component: string, config?: Partial<WindowConfig>) => {
@@ -332,7 +332,7 @@ export default function Window({
           <span className="text-sm font-bold truncate">{title}</span>
         </div>
         <div className="flex gap-1 ml-2">
-          {minimizable && (
+          {(minimizable || maximizable) && (
             <Button
               variant="ghost"
               className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
@@ -344,17 +344,19 @@ export default function Window({
               _
             </Button>
           )}
-          <Button
-            variant="ghost"
-            className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!maximizable) return;
-              onMaximize?.(id);
-            }}
-          >
-            {isMaximized ? '❐' : '□'}
-          </Button>
+          {(minimizable || maximizable) && (
+            <Button
+              variant="ghost"
+              className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!maximizable) return;
+                onMaximize?.(id);
+              }}
+            >
+              {isMaximized ? '❐' : '□'}
+            </Button>
+          )}
           <Button
             variant="ghost"
             className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}

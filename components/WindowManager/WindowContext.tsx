@@ -38,7 +38,8 @@ export interface WindowContextType {
   launchArgs?: Record<string, any>;
   menuBar?: MenuItemType[];
   setMenuBar: (menu: MenuItemType[]) => void;
-  setBeforeClose: (fn: (() => boolean) | undefined) => void;
+  /** Return false (or a Promise that resolves false) to cancel closing */
+  setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
   // Launch a registered application (like running an .exe with arguments)
   launchApp: (component: string, config?: Partial<WindowConfig>) => string | null;
   // Open an in-app child window (not in the registry — the app provides the component inline)

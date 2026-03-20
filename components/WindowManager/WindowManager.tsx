@@ -39,7 +39,7 @@ export default function WindowManager({
     y: 0,
     windowId: null,
   });
-  const beforeCloseHandlersRef = useRef<Record<string, () => boolean>>({});
+  const beforeCloseHandlersRef = useRef<Record<string, () => boolean | Promise<boolean>>>({});
   // Store child window components (not serializable, so kept in ref)
   const childComponentsRef = useRef<Record<string, React.ComponentType<any>>>({});
 
@@ -124,10 +124,14 @@ export default function WindowManager({
   );
 
   const closeWindow = useCallback(
-    (id: string) => {
+    async (id: string) => {
       // 1. Check dynamic handler (from useWindow) - these are refs so they are always current
       const dynamicHandler = beforeCloseHandlersRef.current[id];
-      if (dynamicHandler && !dynamicHandler()) return;
+      if (dynamicHandler) {
+        const result = dynamicHandler();
+        const allowed = result instanceof Promise ? await result : result;
+        if (!allowed) return;
+      }
 
       setPersistentWindows((prev) => {
         // 2. Check registry handler (static) using latest state
@@ -233,7 +237,7 @@ export default function WindowManager({
     [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
-  const setWindowBeforeClose = useCallback((id: string, fn: (() => boolean) | undefined) => {
+  const setWindowBeforeClose = useCallback((id: string, fn: (() => boolean | Promise<boolean>) | undefined) => {
     if (fn) {
       beforeCloseHandlersRef.current[id] = fn;
     } else {

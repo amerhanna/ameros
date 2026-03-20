@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button"
 import { useWindow } from '@/hooks/useWindow';
 import { useMenuBar } from '@/hooks/useMenuBar';
+import { useMessageBox } from '@/hooks/useMessageBox';
 import type { MenuItemType } from '@/components/WindowManager/Menu';
 
 interface DemoAppProps {
@@ -12,6 +13,7 @@ interface DemoAppProps {
 
 export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
   const { maximize, minimize, restore, move, resize, close, isMaximized, isMinimized, x, y, width, height, id } = useWindow();
+  const { showMessageBox, showInputBox } = useMessageBox();
   const [count, setCount] = useState(0);
 
   const menu: MenuItemType[] = useMemo(() => [
@@ -19,14 +21,16 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
       type: 'submenu',
       label: 'File',
       items: [
-        { type: 'item', label: 'New', action: () => alert('New'), shortcut: 'Ctrl+N' },
-        { type: 'item', label: 'Open...', action: () => alert('Open'), shortcut: 'Ctrl+O' },
+        { type: 'item', label: 'New', action: () => void showMessageBox('New', 'New document', true), shortcut: 'Ctrl+N' },
+        { type: 'item', label: 'Open...', action: () => void showMessageBox('Open', 'Choose a file to open.', true), shortcut: 'Ctrl+O' },
         { type: 'separator' },
-        { type: 'item', label: 'Save', action: () => alert('Save'), shortcut: 'Ctrl+S' },
-        { type: 'item', label: 'Save As...', action: () => alert('Save As') },
+        { type: 'item', label: 'Save', action: () => void showMessageBox('Save', 'Document saved.', true), shortcut: 'Ctrl+S' },
+        { type: 'item', label: 'Save As...', action: () => void showInputBox('Save As', 'Enter file name:', true).then((name) => {
+          if (name != null) void showMessageBox('Save As', `Would save as: ${name}`, true);
+        }) },
         { type: 'separator' },
-        { type: 'item', label: 'Page Setup...', action: () => alert('Page Setup'), disabled: true },
-        { type: 'item', label: 'Print...', action: () => alert('Print'), shortcut: 'Ctrl+P' },
+        { type: 'item', label: 'Page Setup...', action: () => void showMessageBox('Page Setup', 'Not available in this demo.', true, ['OK']), disabled: true },
+        { type: 'item', label: 'Print...', action: () => void showMessageBox('Print', 'Sending to printer…', true), shortcut: 'Ctrl+P' },
         { type: 'separator' },
         { type: 'item', label: 'Exit', action: () => close() },
       ],
@@ -35,24 +39,24 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
       type: 'submenu',
       label: 'Edit',
       items: [
-        { type: 'item', label: 'Undo', action: () => alert('Undo'), shortcut: 'Ctrl+Z' },
+        { type: 'item', label: 'Undo', action: () => void showMessageBox('Undo', 'Nothing to undo.', true), shortcut: 'Ctrl+Z' },
         { type: 'separator' },
-        { type: 'item', label: 'Cut', action: () => alert('Cut'), shortcut: 'Ctrl+X' },
-        { type: 'item', label: 'Copy', action: () => alert('Copy'), shortcut: 'Ctrl+C' },
-        { type: 'item', label: 'Paste', action: () => alert('Paste'), shortcut: 'Ctrl+V' },
-        { type: 'item', label: 'Delete', action: () => alert('Delete'), shortcut: 'Del' },
+        { type: 'item', label: 'Cut', action: () => void showMessageBox('Cut', 'Cut to clipboard (demo).', true), shortcut: 'Ctrl+X' },
+        { type: 'item', label: 'Copy', action: () => void showMessageBox('Copy', 'Copied (demo).', true), shortcut: 'Ctrl+C' },
+        { type: 'item', label: 'Paste', action: () => void showMessageBox('Paste', 'Pasted (demo).', true), shortcut: 'Ctrl+V' },
+        { type: 'item', label: 'Delete', action: () => void showMessageBox('Delete', 'Delete selection (demo).', true, ['OK', 'Cancel']), shortcut: 'Del' },
       ],
     },
     {
       type: 'submenu',
       label: 'Help',
       items: [
-        { type: 'item', label: 'Help Topics', action: () => alert('Help') },
+        { type: 'item', label: 'Help Topics', action: () => void showMessageBox('Help', 'Demo help: use the menu and buttons below.', true) },
         { type: 'separator' },
-        { type: 'item', label: 'About DemoApp', action: () => alert('AmerOS Style Menu Bar!') },
+        { type: 'item', label: 'About DemoApp', action: () => void showMessageBox('About DemoApp', 'AmerOS style menu bar and Win95-style message boxes.', true) },
       ],
     },
-  ], [close]);
+  ], [close, showMessageBox, showInputBox]);
 
   useMenuBar(menu);
 
@@ -61,7 +65,7 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
       <h1 className="text-xl font-bold mb-4">{title}</h1>
 
       <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-4 bg-gray-100 p-2 border border-blue-300">
-        <div>ID: {title}</div>
+        <div>ID: {id}</div>
         <div>State: {isMaximized ? 'Maximized' : isMinimized ? 'Minimized' : 'Normal'}</div>
         <div>
           Pos: {Math.round(x)}, {Math.round(y)}
@@ -104,7 +108,22 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
         </Button>
       </div>
 
-      <Button variant="outline">Sample Button</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          onClick={() => void showMessageBox('Message', 'Win95-style message box from useMessageBox.', true, ['OK', 'Cancel'])}
+        >
+          Sample message box
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => void showInputBox('Input', 'Type something:', true).then((v) => {
+            if (v != null) void showMessageBox('You entered', v, true);
+          })}
+        >
+          Sample input box
+        </Button>
+      </div>
     </div>
   );
 }
