@@ -91,6 +91,18 @@ export default function Window({
       y,
       width,
       height,
+      getBounds: () => {
+        const el = containerRef.current;
+        if (!el) {
+          return { x, y, width, height };
+        }
+        return {
+          x: el.offsetLeft,
+          y: el.offsetTop,
+          width: el.offsetWidth,
+          height: el.offsetHeight,
+        };
+      },
       maximize: (e?: React.MouseEvent | React.TouchEvent) => {
         e?.stopPropagation();
         onMaximize?.(id);

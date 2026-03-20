@@ -136,11 +136,16 @@ function InputBoxContent({ message, onResolve }: InputBoxProps) {
 }
 
 export function useMessageBox() {
-  const { openChildWindow } = useWindow();
+  const { openChildWindow, getBounds } = useWindow();
 
   const showMessageBox = useCallback(
     async (title: string, message: string, isModal = true, buttons: string[] = ['OK']) => {
       const safeButtons = buttons.length > 0 ? buttons : ['OK'];
+      const boxW = 360;
+      const boxH = 170;
+      const { x: bx, y: by, width: bw, height: bh } = getBounds();
+      const px = Math.round(bx + Math.max(0, (bw - boxW) / 2));
+      const py = Math.round(by + Math.max(0, (bh - boxH) / 2));
 
       return new Promise<string | null>((resolve) => {
         const Content = () => (
@@ -155,8 +160,10 @@ export function useMessageBox() {
         const id = openChildWindow({
           title,
           component: Content,
-          width: 360,
-          height: 170,
+          width: boxW,
+          height: boxH,
+          x: px,
+          y: py,
           modal: isModal,
           resizable: false,
           maximizable: false,
@@ -168,19 +175,27 @@ export function useMessageBox() {
         }
       });
     },
-    [openChildWindow],
+    [openChildWindow, getBounds],
   );
 
   const showInputBox = useCallback(
     async (title: string, message: string, isModal = true) => {
+      const boxW = 420;
+      const boxH = 180;
+      const { x: bx, y: by, width: bw, height: bh } = getBounds();
+      const px = Math.round(bx + Math.max(0, (bw - boxW) / 2));
+      const py = Math.round(by + Math.max(0, (bh - boxH) / 2));
+
       return new Promise<string | null>((resolve) => {
         const Content = () => <InputBoxContent message={message} onResolve={resolve} />;
 
         const id = openChildWindow({
           title,
           component: Content,
-          width: 420,
-          height: 180,
+          width: boxW,
+          height: boxH,
+          x: px,
+          y: py,
           modal: isModal,
           resizable: false,
           maximizable: false,
@@ -192,7 +207,7 @@ export function useMessageBox() {
         }
       });
     },
-    [openChildWindow],
+    [openChildWindow, getBounds],
   );
 
   return useMemo(

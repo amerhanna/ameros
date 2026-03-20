@@ -200,7 +200,13 @@ export default function WindowManager({
       // Store the component in the ref (not serializable to localStorage)
       childComponentsRef.current[id] = config.component;
 
+      // Stack child above its parent and every other window (avoids stale nextZIndex vs focused parent)
+      let childZIndex = 0;
       setPersistentWindows((prev) => {
+        const maxZ = prev.length ? Math.max(...prev.map((w) => w.zIndex)) : 0;
+        const parent = prev.find((w) => w.id === parentId);
+        childZIndex = Math.max(maxZ + 1, (parent?.zIndex ?? 0) + 1);
+
         const newWindow: PersistentWindowState = {
           id,
           title: config.title,
@@ -211,7 +217,7 @@ export default function WindowManager({
           y: config.y ?? (150 + (prev.length * 20) % 200),
           isMinimized: false,
           isMaximized: false,
-          zIndex: nextZIndex,
+          zIndex: childZIndex,
           launchArgs: config.launchArgs,
           resizable: config.resizable ?? false,
           maximizable: config.maximizable ?? false,
@@ -230,11 +236,11 @@ export default function WindowManager({
       });
 
       setActiveWindowId(id);
-      setNextZIndex((prev) => prev + 1);
+      setNextZIndex((prev) => Math.max(prev, childZIndex + 1));
 
       return id;
     },
-    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
   const setWindowBeforeClose = useCallback((id: string, fn: (() => boolean | Promise<boolean>) | undefined) => {
