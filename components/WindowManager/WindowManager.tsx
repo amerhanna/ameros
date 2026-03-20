@@ -1,18 +1,18 @@
-"use client"
+'use client';
 
-import type React from "react"
+import type React from 'react';
 
-import { useState, useCallback } from "react"
-import Window from "./Window"
-import Taskbar from "./Taskbar"
-import StartMenu from "./StartMenu"
-import type { WindowState } from "./types/window"
+import { useState, useCallback } from 'react';
+import Window from '@/components/WindowManager/Window';
+import Taskbar from '@/components/WindowManager/Taskbar';
+import StartMenu from '@/components/WindowManager/StartMenu';
+import type { WindowState } from '@/types/window';
 
 // Import components
-import DemoApp from "./DemoApp"
-import TextEditor from "./components/TextEditor"
-import Calculator from "./components/Calculator"
-import FileExplorer from "./components/FileExplorer"
+import DemoApp from '@/components/DemoApp';
+import TextEditor from '@/components/TextEditor';
+import Calculator from '@/components/Calculator';
+import FileExplorer from '@/components/FileExplorer';
 
 // Component registry
 const componentRegistry = {
@@ -20,24 +20,24 @@ const componentRegistry = {
   TextEditor,
   Calculator,
   FileExplorer,
-}
+};
 
 interface WindowManagerProps {
-  children?: React.ReactNode
+  children?: React.ReactNode;
 }
 
 export default function WindowManager({ children }: WindowManagerProps) {
-  const [windows, setWindows] = useState<WindowState[]>([])
-  const [activeWindowId, setActiveWindowId] = useState<string | null>(null)
-  const [nextZIndex, setNextZIndex] = useState(1)
-  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false)
+  const [windows, setWindows] = useState<WindowState[]>([]);
+  const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
+  const [nextZIndex, setNextZIndex] = useState(1);
+  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
 
   const openWindow = useCallback(
     (windowConfig: any) => {
-      const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Get component from registry
-      const ComponentClass = componentRegistry[windowConfig.component as keyof typeof componentRegistry]
+      const ComponentClass = componentRegistry[windowConfig.component as keyof typeof componentRegistry];
 
       const newWindow: WindowState = {
         ...windowConfig,
@@ -48,26 +48,26 @@ export default function WindowManager({ children }: WindowManagerProps) {
         originalHeight: windowConfig.height,
         originalX: windowConfig.x,
         originalY: windowConfig.y,
-      }
+      };
 
-      setWindows((prev) => [...prev, newWindow])
-      setActiveWindowId(id)
-      setNextZIndex((prev) => prev + 1)
+      setWindows((prev) => [...prev, newWindow]);
+      setActiveWindowId(id);
+      setNextZIndex((prev) => prev + 1);
 
-      return id
+      return id;
     },
     [nextZIndex],
-  )
+  );
 
   const closeWindow = useCallback((id: string) => {
-    setWindows((prev) => prev.filter((w) => w.id !== id))
-    setActiveWindowId((prev) => (prev === id ? null : prev))
-  }, [])
+    setWindows((prev) => prev.filter((w) => w.id !== id));
+    setActiveWindowId((prev) => (prev === id ? null : prev));
+  }, []);
 
   const minimizeWindow = useCallback((id: string) => {
-    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)))
-    setActiveWindowId((prev) => (prev === id ? null : prev))
-  }, [])
+    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)));
+    setActiveWindowId((prev) => (prev === id ? null : prev));
+  }, []);
 
   const maximizeWindow = useCallback(
     (id: string) => {
@@ -84,7 +84,7 @@ export default function WindowManager({ children }: WindowManagerProps) {
                 x: w.originalX,
                 y: w.originalY,
                 zIndex: nextZIndex,
-              }
+              };
             } else {
               // Store current position as original if not already maximized
               return {
@@ -95,65 +95,65 @@ export default function WindowManager({ children }: WindowManagerProps) {
                 originalX: w.x,
                 originalY: w.y,
                 zIndex: nextZIndex,
-              }
+              };
             }
           }
-          return w
+          return w;
         }),
-      )
-      setActiveWindowId(id)
-      setNextZIndex((prev) => prev + 1)
+      );
+      setActiveWindowId(id);
+      setNextZIndex((prev) => prev + 1);
     },
     [nextZIndex],
-  )
+  );
 
   const focusWindow = useCallback(
     (id: string) => {
-      setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)))
-      setActiveWindowId(id)
-      setNextZIndex((prev) => prev + 1)
+      setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)));
+      setActiveWindowId(id);
+      setNextZIndex((prev) => prev + 1);
     },
     [nextZIndex],
-  )
+  );
 
   const moveWindow = useCallback((id: string, x: number, y: number) => {
     setWindows((prev) =>
       prev.map((w) => {
         if (w.id === id && !w.isMaximized) {
-          return { ...w, x, y }
+          return { ...w, x, y };
         }
-        return w
+        return w;
       }),
-    )
-  }, [])
+    );
+  }, []);
 
   const handleTaskbarWindowSelect = useCallback(
     (id: string) => {
-      const window = windows.find((w) => w.id === id)
+      const window = windows.find((w) => w.id === id);
       if (window?.isMinimized) {
-        focusWindow(id)
+        focusWindow(id);
       } else if (activeWindowId === id) {
-        minimizeWindow(id)
+        minimizeWindow(id);
       } else {
-        focusWindow(id)
+        focusWindow(id);
       }
     },
     [windows, activeWindowId, focusWindow, minimizeWindow],
-  )
+  );
 
   const toggleStartMenu = useCallback(() => {
-    setIsStartMenuOpen((prev) => !prev)
-  }, [])
+    setIsStartMenuOpen((prev) => !prev);
+  }, []);
 
   const closeStartMenu = useCallback(() => {
-    setIsStartMenuOpen(false)
-  }, [])
+    setIsStartMenuOpen(false);
+  }, []);
 
   return (
     <div className="h-screen bg-teal-600 overflow-hidden relative">
       {/* Render Windows */}
       {windows.map((window) => {
-        const WindowComponent = window.component
+        const WindowComponent = window.component;
         return (
           <Window
             key={window.id}
@@ -175,7 +175,7 @@ export default function WindowManager({ children }: WindowManagerProps) {
           >
             <WindowComponent {...window.props} />
           </Window>
-        )
+        );
       })}
 
       {/* Start Menu */}
@@ -193,5 +193,5 @@ export default function WindowManager({ children }: WindowManagerProps) {
       {/* Custom Content */}
       {children}
     </div>
-  )
+  );
 }

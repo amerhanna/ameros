@@ -1,5 +1,5 @@
-import WindowManagerDemo from "../WindowManagerDemo"
+import WindowManagerDemo from './components/WindowManagerDemo';
 
 export default function Page() {
-  return <WindowManagerDemo />
+  return <WindowManagerDemo />;
 }
