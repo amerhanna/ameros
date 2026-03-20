@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useRef, useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import WindowContextMenu from './WindowContextMenu';
 
 interface WindowProps {
   id: string;
@@ -61,6 +62,8 @@ export default function Window({
   const [resizeDir, setResizeDir] = useState<string | null>(null);
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
   const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const prevActiveRef = useRef(isActive);
 
   useEffect(() => {
@@ -140,6 +143,28 @@ export default function Window({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [dragging, resizing, resizeDir, initialMouse, initialRect, id, minWidth, minHeight, onMove, onResize]);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+      setShowContextMenu(true);
+      onFocus?.(id);
+    },
+    [id, onFocus],
+  );
+
+  const handleIconClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      // Position below the icon
+      setContextMenuPos({ x: rect.left, y: rect.bottom });
+      setShowContextMenu(true);
+      onFocus?.(id);
+    },
+    [id, onFocus],
+  );
 
   const maximizedStyle = isMaximized
     ? {
@@ -227,9 +252,12 @@ export default function Window({
         }`}
         onMouseDown={startDragging}
         onDoubleClick={handleDoubleClickTitleBar}
+        onContextMenu={handleContextMenu}
       >
         <div className="flex items-center gap-2 overflow-hidden">
-          <span className="text-base flex-shrink-0">{icon}</span>
+          <span className="text-base flex-shrink-0 cursor-default" onMouseDown={handleIconClick}>
+            {icon}
+          </span>
           <span className="text-sm font-bold truncate">{title}</span>
         </div>
         <div className="flex gap-1 ml-2">
@@ -279,6 +307,29 @@ export default function Window({
       >
         {children}
       </div>
+
+      {showContextMenu && (
+        <WindowContextMenu
+          x={contextMenuPos.x}
+          y={contextMenuPos.y}
+          isMaximized={isMaximized}
+          isMinimized={isMinimized}
+          maximizable={maximizable}
+          onClose={() => onClose?.(id)}
+          onMinimize={() => onMinimize?.(id)}
+          onMaximize={() => !isMaximized && onMaximize?.(id)}
+          onRestore={() => isMaximized && onMaximize?.(id)} // isMaximized true means we want to restore
+          onMove={() => {
+            // Move: In Windows 95 this puts you in a keyboard move mode.
+            // For now, let's just trigger a focus and maybe we can implement more later.
+            onFocus?.(id);
+          }}
+          onResize={() => {
+            onFocus?.(id);
+          }}
+          onDismiss={() => setShowContextMenu(false)}
+        />
+      )}
     </div>
   );
 }
