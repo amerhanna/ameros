@@ -6,6 +6,7 @@ import TextEditor from '@/components/TextEditor';
 import Calculator from '@/components/Calculator';
 import FileExplorer from '@/components/FileExplorer';
 import Settings from '@/components/WindowManager/Settings';
+import TestCloseApp from '@/components/TestCloseApp';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -26,6 +27,7 @@ const applicationRegistry: ApplicationRegistry = {
     height: 310,
     resizable: false,
     maximizable: false,
+    beforeClose: () => confirm('Registry: Are you sure you want to close the Calculator?'),
   },
   FileExplorer: {
     component: FileExplorer,
@@ -50,6 +52,13 @@ const applicationRegistry: ApplicationRegistry = {
     height: 500,
     resizable: true,
   },
+  TestCloseApp: {
+    component: TestCloseApp,
+    icon: '🧪',
+    width: 400,
+    height: 300,
+    resizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -59,6 +68,7 @@ const startMenuItems: StartMenuItem[] = [
   { label: 'Demo Application', component: 'DemoApp' },
   { type: 'separator' },
   { label: 'Settings', component: 'Settings' },
+  { label: 'Test Close', component: 'TestCloseApp' },
   { type: 'separator' },
   {
     icon: '🔌',

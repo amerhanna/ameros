@@ -54,6 +54,7 @@ export interface Application {
   minHeight?: number
   resizable?: boolean
   maximizable?: boolean
+  beforeClose?: () => boolean
 }
 
 export type ApplicationRegistry = Record<string, Application>

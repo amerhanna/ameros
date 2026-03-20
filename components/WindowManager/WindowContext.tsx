@@ -20,6 +20,7 @@ export interface WindowContextType {
   height: number;
   menuBar?: MenuItemType[];
   setMenuBar: (menu: MenuItemType[]) => void;
+  setBeforeClose: (fn: (() => boolean) | undefined) => void;
 }
 
 export const WindowContext = createContext<WindowContextType | null>(null);

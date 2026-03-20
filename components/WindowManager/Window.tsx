@@ -32,6 +32,7 @@ interface WindowProps {
   onResize?: (id: string, width: number, height: number, x?: number, y?: number) => void;
   onBlur?: (id: string) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
+  setBeforeClose?: (fn: (() => boolean) | undefined) => void;
 }
 
 export default function Window({
@@ -59,6 +60,7 @@ export default function Window({
   onResize,
   onBlur,
   onContextMenu,
+  setBeforeClose,
 }: WindowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -111,8 +113,11 @@ export default function Window({
       },
       menuBar,
       setMenuBar,
+      setBeforeClose: (fn: (() => boolean) | undefined) => {
+        setBeforeClose?.(fn);
+      },
     }),
-    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose],
+    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose, setBeforeClose],
   );
 
   useEffect(() => {

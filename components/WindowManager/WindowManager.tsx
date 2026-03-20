@@ -2,7 +2,7 @@
 
 import type React from 'react';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
@@ -37,6 +37,7 @@ export default function WindowManager({
     y: 0,
     windowId: null,
   });
+  const beforeCloseHandlersRef = useRef<Record<string, () => boolean>>({});
 
   // Handle hydration mismatch by only rendering windows after mount
   useEffect(() => {
@@ -103,11 +104,33 @@ export default function WindowManager({
 
   const closeWindow = useCallback(
     (id: string) => {
+      // 1. Check dynamic handler (from useWindow)
+      const dynamicHandler = beforeCloseHandlersRef.current[id];
+      if (dynamicHandler && !dynamicHandler()) return;
+
+      // 2. Check registry handler (static)
+      if (!dynamicHandler) {
+        const pWindow = persistentWindows.find((w) => w.id === id);
+        const app = pWindow ? applicationRegistry[pWindow.component] : null;
+        if (app?.beforeClose && !app.beforeClose()) return;
+      }
+
       setPersistentWindows((prev) => prev.filter((w) => w.id !== id));
       setActiveWindowId((prev) => (prev === id ? null : prev));
+
+      // Cleanup
+      delete beforeCloseHandlersRef.current[id];
     },
-    [setPersistentWindows, setActiveWindowId],
+    [setPersistentWindows, setActiveWindowId, persistentWindows, applicationRegistry],
   );
+
+  const setWindowBeforeClose = useCallback((id: string, fn: (() => boolean) | undefined) => {
+    if (fn) {
+      beforeCloseHandlersRef.current[id] = fn;
+    } else {
+      delete beforeCloseHandlersRef.current[id];
+    }
+  }, []);
 
   const minimizeWindow = useCallback(
     (id: string) => {
@@ -269,6 +292,7 @@ export default function WindowManager({
             onMove={moveWindow}
             onResize={resizeWindow}
             onContextMenu={openWindowMenu}
+            setBeforeClose={(fn) => setWindowBeforeClose(window.id, fn)}
           >
             <WindowComponent {...window.props} />
           </Window>
