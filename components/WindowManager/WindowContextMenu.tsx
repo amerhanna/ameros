@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { MenuContent, MenuItemType } from './Menu';
 
 interface WindowContextMenuProps {
   x: number;
@@ -31,106 +32,78 @@ export default function WindowContextMenu({
   onResize,
   onDismiss,
 }: WindowContextMenuProps) {
-  const menuRef = React.useRef<HTMLDivElement>(null);
   const [adjustedPos, setAdjustedPos] = React.useState({ left: x, top: y });
+  const menuRef = React.useRef<HTMLDivElement>(null);
 
   // Adjust position to stay within screen boundaries
   React.useLayoutEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
+    const checkPosition = () => {
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
       const padding = 4;
+      
+      // We don't know the exact width/height yet because it's rendering, 
+      // but we can estimate or just use fixed values for now.
+      // A more robust way would be measuring the element after it renders.
+      const estimatedWidth = 160;
+      const estimatedHeight = 200;
 
       let newLeft = x;
       let newTop = y;
 
-      if (x + rect.width > screenWidth - padding) {
-        newLeft = screenWidth - rect.width - padding;
+      if (x + estimatedWidth > screenWidth - padding) {
+        newLeft = screenWidth - estimatedWidth - padding;
       }
-      if (y + rect.height > screenHeight - padding) {
-        newTop = screenHeight - rect.height - padding;
+      if (y + estimatedHeight > screenHeight - padding) {
+        newTop = screenHeight - estimatedHeight - padding;
       }
 
-      // Ensure it doesn't go off the left or top either
       newLeft = Math.max(padding, newLeft);
       newTop = Math.max(padding, newTop);
 
       setAdjustedPos({ left: newLeft, top: newTop });
-    }
+    };
+
+    checkPosition();
   }, [x, y]);
 
-  // Close menu when clicking outside
+  // Handle clicking outside to close
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onDismiss();
-      }
+      onDismiss();
     };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    // Use timeout to avoid closing immediately due to the same event that opened it
+    const timer = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 10);
+    
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      clearTimeout(timer);
+    };
   }, [onDismiss]);
 
-  type MenuItem =
-    | { type: 'item'; label: string; action: () => void; disabled: boolean; shortcut: string; bold?: boolean }
-    | { type: 'separator' };
-
-  const menuItems: MenuItem[] = [
-    { type: 'item', label: 'Restore', action: onRestore, disabled: !isMaximized && !isMinimized, shortcut: '' },
-    { type: 'item', label: 'Move', action: onMove, disabled: isMaximized, shortcut: '' },
-    { type: 'item', label: 'Resize', action: onResize, disabled: isMaximized, shortcut: '' },
-    { type: 'item', label: 'Minimize', action: onMinimize, disabled: isMinimized, shortcut: '' },
-    { type: 'item', label: 'Maximize', action: onMaximize, disabled: isMaximized || !maximizable, shortcut: '' },
+  const menuItems: MenuItemType[] = [
+    { type: 'item', label: 'Restore', action: onRestore, disabled: !isMaximized && !isMinimized },
+    { type: 'item', label: 'Move', action: onMove, disabled: isMaximized },
+    { type: 'item', label: 'Size', action: onResize, disabled: isMaximized },
+    { type: 'item', label: 'Minimize', action: onMinimize, disabled: isMinimized },
+    { type: 'item', label: 'Maximize', action: onMaximize, disabled: isMaximized || !maximizable },
     { type: 'separator' },
-    { type: 'item', label: 'Close', action: onClose, disabled: false, shortcut: 'Alt+F4', bold: true },
+    { type: 'item', label: 'Close', action: onClose, shortcut: 'Alt+F4', bold: true },
   ];
 
   return (
     <div
-      ref={menuRef}
-      className="fixed z-[9999] bg-[#c0c0c0] border-2 border-white shadow-[2px_2px_5px_rgba(0,0,0,0.5)] py-1 min-w-[150px] select-none text-black"
       style={{
+        position: 'fixed',
         left: adjustedPos.left,
         top: adjustedPos.top,
-        borderTopColor: '#ffffff',
-        borderLeftColor: '#ffffff',
-        borderRightColor: '#808080',
-        borderBottomColor: '#808080',
+        zIndex: 9999,
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {menuItems.map((item, index) => {
-        if (item.type === 'separator') {
-          return <div key={index} className="h-[1px] bg-gray-400 my-1 mx-1 border-b border-white" />;
-        }
-
-        const isItem = item.type === 'item';
-        const label = isItem ? item.label : '';
-        const action = isItem ? item.action : () => {};
-        const disabled = isItem ? item.disabled : false;
-        const shortcut = isItem ? item.shortcut : '';
-        const bold = isItem ? item.bold : false;
-
-        return (
-          <div
-            key={index}
-            className={`px-4 py-1 flex justify-between items-center text-sm cursor-default ${
-              disabled ? 'text-gray-500' : 'hover:bg-[#000080] hover:text-white'
-            }`}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              if (isItem && !disabled) {
-                console.log('Context menu action:', label);
-                action();
-                onDismiss();
-              }
-            }}
-          >
-            <span className={bold ? 'font-bold' : ''}>{label}</span>
-            {shortcut && <span className="ml-4 opacity-70 text-xs">{shortcut}</span>}
-          </div>
-        );
-      })}
+      <MenuContent items={menuItems} onClose={onDismiss} />
     </div>
   );
 }

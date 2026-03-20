@@ -1,16 +1,60 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button"
 import { useWindow } from '@/hooks/useWindow';
+import { useMenuBar } from '@/hooks/useMenuBar';
+import type { MenuItemType } from '@/components/WindowManager/Menu';
 
 interface DemoAppProps {
   title?: string
 }
 
 export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
-  const { maximize, minimize, restore, move, resize, isMaximized, isMinimized, x, y, width, height } = useWindow();
+  const { maximize, minimize, restore, move, resize, close, isMaximized, isMinimized, x, y, width, height, id } = useWindow();
   const [count, setCount] = useState(0);
+
+  const menu: MenuItemType[] = useMemo(() => [
+    {
+      type: 'submenu',
+      label: 'File',
+      items: [
+        { type: 'item', label: 'New', action: () => alert('New'), shortcut: 'Ctrl+N' },
+        { type: 'item', label: 'Open...', action: () => alert('Open'), shortcut: 'Ctrl+O' },
+        { type: 'separator' },
+        { type: 'item', label: 'Save', action: () => alert('Save'), shortcut: 'Ctrl+S' },
+        { type: 'item', label: 'Save As...', action: () => alert('Save As') },
+        { type: 'separator' },
+        { type: 'item', label: 'Page Setup...', action: () => alert('Page Setup'), disabled: true },
+        { type: 'item', label: 'Print...', action: () => alert('Print'), shortcut: 'Ctrl+P' },
+        { type: 'separator' },
+        { type: 'item', label: 'Exit', action: () => close() },
+      ],
+    },
+    {
+      type: 'submenu',
+      label: 'Edit',
+      items: [
+        { type: 'item', label: 'Undo', action: () => alert('Undo'), shortcut: 'Ctrl+Z' },
+        { type: 'separator' },
+        { type: 'item', label: 'Cut', action: () => alert('Cut'), shortcut: 'Ctrl+X' },
+        { type: 'item', label: 'Copy', action: () => alert('Copy'), shortcut: 'Ctrl+C' },
+        { type: 'item', label: 'Paste', action: () => alert('Paste'), shortcut: 'Ctrl+V' },
+        { type: 'item', label: 'Delete', action: () => alert('Delete'), shortcut: 'Del' },
+      ],
+    },
+    {
+      type: 'submenu',
+      label: 'Help',
+      items: [
+        { type: 'item', label: 'Help Topics', action: () => alert('Help') },
+        { type: 'separator' },
+        { type: 'item', label: 'About DemoApp', action: () => alert('Win95 Style Menu Bar!') },
+      ],
+    },
+  ], [close]);
+
+  useMenuBar(menu);
 
   return (
     <div className="p-4">

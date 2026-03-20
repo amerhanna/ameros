@@ -4,6 +4,8 @@ import type React from "react"
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { WindowContext } from './WindowContext';
+import MenuBar from './MenuBar';
+import type { MenuItemType } from './Menu';
 
 interface WindowProps {
   id: string;
@@ -64,6 +66,7 @@ export default function Window({
   const [resizeDir, setResizeDir] = useState<string | null>(null);
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
   const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [menuBar, setMenuBar] = useState<MenuItemType[] | undefined>();
   const prevActiveRef = useRef(isActive);
 
   const windowContextValue = useMemo(
@@ -103,8 +106,13 @@ export default function Window({
           onResize?.(id, width, height, x, y);
         }
       },
+      close: () => {
+        onClose?.(id);
+      },
+      menuBar,
+      setMenuBar,
     }),
-    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize],
+    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose],
   );
 
   useEffect(() => {
@@ -334,6 +342,13 @@ export default function Window({
           </Button>
         </div>
       </div>
+
+      {/* Menu Bar */}
+      {menuBar && (
+        <div className="flex-shrink-0">
+          <MenuBar items={menuBar} />
+        </div>
+      )}
 
       {/* Content Area */}
       <div
