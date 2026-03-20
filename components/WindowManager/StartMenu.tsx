@@ -1,15 +1,18 @@
 "use client"
 
+import type React from "react"
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef } from "react"
+import type { StartMenuItem, WindowConfig } from "@/types/window"
 
 interface StartMenuProps {
   isOpen: boolean
   onClose: () => void
-  onOpenWindow: (windowConfig: any) => void
+  onOpenWindow: (windowConfig: WindowConfig) => void
+  items: StartMenuItem[]
 }
 
-export default function StartMenu({ isOpen, onClose, onOpenWindow }: StartMenuProps) {
+export default function StartMenu({ isOpen, onClose, onOpenWindow, items }: StartMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -30,95 +33,14 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow }: StartMenuPr
 
   if (!isOpen) return null
 
-  const menuItems = [
-    {
-      icon: "📄",
-      label: "Text Editor",
-      action: () => {
-        onOpenWindow({
-          title: "Text Editor",
-          width: 500,
-          height: 350,
-          x: 200,
-          y: 150,
-          isMinimized: false,
-          isMaximized: false,
-          component: "TextEditor",
-        })
-        onClose()
-      },
-    },
-    {
-      icon: "🧮",
-      label: "Calculator",
-      action: () => {
-        onOpenWindow({
-          title: "Calculator",
-          width: 250,
-          height: 300,
-          x: 300,
-          y: 200,
-          isMinimized: false,
-          isMaximized: false,
-          component: "Calculator",
-        })
-        onClose()
-      },
-    },
-    {
-      icon: "📁",
-      label: "File Explorer",
-      action: () => {
-        onOpenWindow({
-          title: "File Explorer",
-          width: 400,
-          height: 400,
-          x: 150,
-          y: 100,
-          isMinimized: false,
-          isMaximized: false,
-          component: "FileExplorer",
-        })
-        onClose()
-      },
-    },
-    {
-      icon: "🎨",
-      label: "Demo Application",
-      action: () => {
-        onOpenWindow({
-          title: "Demo Application",
-          width: 400,
-          height: 300,
-          x: 100,
-          y: 100,
-          isMinimized: false,
-          isMaximized: false,
-          component: "DemoApp",
-          props: { title: "My Demo App" },
-        })
-        onClose()
-      },
-    },
-    { type: "separator" },
-    {
-      icon: "⚙️",
-      label: "Settings",
-      action: () => {
-        console.log("Settings clicked")
-        onClose()
-      },
-    },
-    { type: "separator" },
-    {
-      icon: "🔌",
-      label: "Shut Down...",
-      action: () => {
-        console.log("Shut down clicked")
-        onClose()
-      },
-    },
-  ]
+  const handleItemClick = (item: StartMenuItem) => {
+    if (item.action) {
+      item.action()
+    } else if (item.windowConfig) {
+      onOpenWindow(item.windowConfig)
+    }
+    onClose()
+  }
 
   return (
     <div
@@ -134,7 +56,7 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow }: StartMenuPr
 
       {/* Menu Items */}
       <div className="py-1">
-        {menuItems.map((item, index) => {
+        {items.map((item, index) => {
           if (item.type === "separator") {
             return <div key={index} className="h-px bg-gray-400 mx-2 my-1" />
           }
@@ -144,7 +66,7 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow }: StartMenuPr
               key={index}
               variant="ghost"
               className="w-full justify-start px-3 py-2 h-auto text-left hover:bg-blue-600 hover:text-white rounded-none"
-              onClick={item.action}
+              onClick={() => handleItemClick(item)}
             >
               <span className="mr-3 text-base">{item.icon}</span>
               <span className="text-sm">{item.label}</span>

@@ -6,42 +6,37 @@ import { useState, useCallback } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
-import type { WindowState } from '@/types/window';
-
-// Import components
-import DemoApp from '@/components/DemoApp';
-import TextEditor from '@/components/TextEditor';
-import Calculator from '@/components/Calculator';
-import FileExplorer from '@/components/FileExplorer';
-
-// Component registry
-const componentRegistry = {
-  DemoApp,
-  TextEditor,
-  Calculator,
-  FileExplorer,
-};
+import type { WindowState, StartMenuItem, WindowConfig } from '@/types/window';
 
 interface WindowManagerProps {
   children?: React.ReactNode;
+  registry?: Record<string, React.ComponentType<any>>;
+  startMenuItems?: StartMenuItem[];
 }
 
-export default function WindowManager({ children }: WindowManagerProps) {
+export default function WindowManager({ children, registry = {}, startMenuItems = [] }: WindowManagerProps) {
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const [nextZIndex, setNextZIndex] = useState(1);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
 
   const openWindow = useCallback(
-    (windowConfig: any) => {
+    (windowConfig: WindowConfig) => {
       const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Get component from registry
-      const ComponentClass = componentRegistry[windowConfig.component as keyof typeof componentRegistry];
+      const ComponentClass = registry[windowConfig.component];
+
+      if (!ComponentClass) {
+        console.warn(`Component "${windowConfig.component}" not found in registry`);
+        return;
+      }
 
       const newWindow: WindowState = {
         ...windowConfig,
         id,
+        isMinimized: windowConfig.isMinimized ?? false,
+        isMaximized: windowConfig.isMaximized ?? false,
         zIndex: nextZIndex,
         component: ComponentClass,
         originalWidth: windowConfig.width,
@@ -179,7 +174,7 @@ export default function WindowManager({ children }: WindowManagerProps) {
       })}
 
       {/* Start Menu */}
-      <StartMenu isOpen={isStartMenuOpen} onClose={closeStartMenu} onOpenWindow={openWindow} />
+      <StartMenu isOpen={isStartMenuOpen} onClose={closeStartMenu} onOpenWindow={openWindow} items={startMenuItems} />
 
       {/* Taskbar */}
       <Taskbar
