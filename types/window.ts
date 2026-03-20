@@ -9,18 +9,24 @@ export interface WindowConfig {
   isMinimized?: boolean
   isMaximized?: boolean
   component: string
-  props?: any
+  launchArgs?: Record<string, any>
   // New properties from registry
   icon?: string
   resizable?: boolean
   minWidth?: number
   minHeight?: number
   maximizable?: boolean
+  minimizable?: boolean
+  // Modal & child window support
+  modal?: boolean
+  parentWindowId?: string
+  childWindow?: boolean
 }
 
 export type StartMenuItem = {
   label: string
   component: string
+  launchArgs?: Record<string, any>
   type?: "item"
 } | {
   type: "separator"
@@ -54,6 +60,7 @@ export interface Application {
   minHeight?: number
   resizable?: boolean
   maximizable?: boolean
+  minimizable?: boolean
   beforeClose?: () => boolean
 }
 

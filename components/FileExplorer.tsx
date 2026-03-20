@@ -1,6 +1,17 @@
 "use client"
 
+import { useWindow } from "@/hooks/useWindow"
+
 export default function FileExplorer() {
+  const { launchApp } = useWindow();
+
+  const handleOpenFile = (fileName: string) => {
+    launchApp('TextEditor', { 
+      title: `${fileName} - Text Editor`,
+      launchArgs: { filePath: fileName }
+    });
+  };
+
   return (
     <div className="p-4 h-full">
       <h2 className="text-lg font-bold mb-2">File Explorer</h2>
@@ -18,9 +29,19 @@ export default function FileExplorer() {
             <span>📁</span>
             <span>Music</span>
           </div>
-          <div className="flex items-center gap-2 p-1 hover:bg-blue-100 cursor-pointer">
+          <div 
+            className="flex items-center gap-2 p-1 hover:bg-blue-100 cursor-pointer"
+            onDoubleClick={() => handleOpenFile('readme.txt')}
+          >
             <span>📄</span>
             <span>readme.txt</span>
+          </div>
+          <div 
+            className="flex items-center gap-2 p-1 hover:bg-blue-100 cursor-pointer"
+            onDoubleClick={() => handleOpenFile('notes.txt')}
+          >
+            <span>📄</span>
+            <span>notes.txt</span>
           </div>
         </div>
       </div>

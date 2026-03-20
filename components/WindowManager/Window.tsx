@@ -3,9 +3,10 @@
 import type React from "react"
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { WindowContext } from './WindowContext';
+import { WindowContext, type ChildWindowConfig } from './WindowContext';
 import MenuBar from './MenuBar';
 import type { MenuItemType } from './Menu';
+import type { WindowConfig } from '@/types/window';
 
 interface WindowProps {
   id: string;
@@ -23,6 +24,9 @@ interface WindowProps {
   minWidth?: number;
   minHeight?: number;
   maximizable?: boolean;
+  minimizable?: boolean;
+  launchArgs?: Record<string, any>;
+  isBlocked?: boolean;
   children?: React.ReactNode;
   onMinimize?: (id: string) => void;
   onMaximize?: (id: string) => void;
@@ -33,6 +37,8 @@ interface WindowProps {
   onBlur?: (id: string) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
   setBeforeClose?: (fn: (() => boolean) | undefined) => void;
+  launchApp?: (component: string, config?: Partial<WindowConfig>) => string | null;
+  openChildWindow?: (config: ChildWindowConfig) => string | null;
 }
 
 export default function Window({
@@ -51,6 +57,9 @@ export default function Window({
   minWidth = 200,
   minHeight = 100,
   maximizable = true,
+  minimizable = true,
+  launchArgs,
+  isBlocked = false,
   children,
   onMinimize,
   onMaximize,
@@ -61,6 +70,8 @@ export default function Window({
   onBlur,
   onContextMenu,
   setBeforeClose,
+  launchApp,
+  openChildWindow,
 }: WindowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -111,13 +122,20 @@ export default function Window({
       close: () => {
         onClose?.(id);
       },
+      launchArgs,
       menuBar,
       setMenuBar,
       setBeforeClose: (fn: (() => boolean) | undefined) => {
         setBeforeClose?.(fn);
       },
+      launchApp: (component: string, config?: Partial<WindowConfig>) => {
+        return launchApp?.(component, config) ?? null;
+      },
+      openChildWindow: (config: ChildWindowConfig) => {
+        return openChildWindow?.(config) ?? null;
+      },
     }),
-    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose, setBeforeClose],
+    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose, setBeforeClose, launchArgs, launchApp, openChildWindow],
   );
 
   useEffect(() => {
@@ -314,16 +332,18 @@ export default function Window({
           <span className="text-sm font-bold truncate">{title}</span>
         </div>
         <div className="flex gap-1 ml-2">
-          <Button
-            variant="ghost"
-            className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMinimize?.(id);
-            }}
-          >
-            _
-          </Button>
+          {minimizable && (
+            <Button
+              variant="ghost"
+              className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMinimize?.(id);
+              }}
+            >
+              _
+            </Button>
+          )}
           <Button
             variant="ghost"
             className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
@@ -366,6 +386,17 @@ export default function Window({
         }}
       >
         <WindowContext.Provider value={windowContextValue}>{children}</WindowContext.Provider>
+        {/* Modal blocking overlay */}
+        {isBlocked && (
+          <div 
+            className="absolute inset-0 z-50"
+            style={{ cursor: 'not-allowed' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocus?.(id);
+            }}
+          />
+        )}
       </div>
     </div>
   );

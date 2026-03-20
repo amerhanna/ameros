@@ -39,7 +39,7 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
       item.action()
     } else if (item.type === "item" || !item.type) {
       if ('component' in item) {
-        onOpenWindow({ component: item.component })
+        onOpenWindow({ component: item.component, launchArgs: item.launchArgs })
       }
     }
     onClose()
