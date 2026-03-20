@@ -6,79 +6,59 @@ import TextEditor from '@/components/TextEditor';
 import Calculator from '@/components/Calculator';
 import FileExplorer from '@/components/FileExplorer';
 import Settings from '@/components/WindowManager/Settings';
-import type { StartMenuItem } from '@/types/window';
+import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
-const componentRegistry = {
-  DemoApp,
-  TextEditor,
-  Calculator,
-  FileExplorer,
-  Settings,
+const applicationRegistry: ApplicationRegistry = {
+  TextEditor: {
+    component: TextEditor,
+    icon: '📄',
+    width: 500,
+    height: 350,
+    resizable: true,
+    minWidth: 300,
+    minHeight: 200,
+    maximizable: true,
+  },
+  Calculator: {
+    component: Calculator,
+    icon: '🧮',
+    width: 250,
+    height: 310,
+    resizable: false,
+    maximizable: false,
+  },
+  FileExplorer: {
+    component: FileExplorer,
+    icon: '📁',
+    width: 400,
+    height: 400,
+    resizable: true,
+    minWidth: 300,
+    minHeight: 200,
+  },
+  DemoApp: {
+    component: DemoApp,
+    icon: '🎨',
+    width: 400,
+    height: 300,
+    resizable: true,
+  },
+  Settings: {
+    component: Settings,
+    icon: '⚙️',
+    width: 600,
+    height: 500,
+    resizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
-  {
-    icon: '📄',
-    label: 'Text Editor',
-    windowConfig: {
-      title: 'Text Editor',
-      width: 500,
-      height: 350,
-      x: 200,
-      y: 150,
-      component: 'TextEditor',
-    },
-  },
-  {
-    icon: '🧮',
-    label: 'Calculator',
-    windowConfig: {
-      title: 'Calculator',
-      width: 250,
-      height: 310,
-      x: 300,
-      y: 200,
-      component: 'Calculator',
-    },
-  },
-  {
-    icon: '📁',
-    label: 'File Explorer',
-    windowConfig: {
-      title: 'File Explorer',
-      width: 400,
-      height: 400,
-      x: 150,
-      y: 100,
-      component: 'FileExplorer',
-    },
-  },
-  {
-    icon: '🎨',
-    label: 'Demo Application',
-    windowConfig: {
-      title: 'Demo Application',
-      width: 400,
-      height: 300,
-      x: 100,
-      y: 100,
-      component: 'DemoApp',
-      props: { title: 'My Demo App' },
-    },
-  },
+  { label: 'Text Editor', component: 'TextEditor' },
+  { label: 'Calculator', component: 'Calculator' },
+  { label: 'File Explorer', component: 'FileExplorer' },
+  { label: 'Demo Application', component: 'DemoApp' },
   { type: 'separator' },
-  {
-    icon: '⚙️',
-    label: 'Settings',
-    windowConfig: {
-      title: 'Settings',
-      width: 600,
-      height: 500,
-      x: 100,
-      y: 50,
-      component: 'Settings',
-    },
-  },
+  { label: 'Settings', component: 'Settings' },
   { type: 'separator' },
   {
     icon: '🔌',
@@ -86,13 +66,14 @@ const startMenuItems: StartMenuItem[] = [
     action: () => {
       console.log('Shut down clicked');
     },
+    type: 'action',
   },
 ];
 
 export default function WindowManagerDemo() {
   return (
     <WindowManager 
-      registry={componentRegistry} 
+      applicationRegistry={applicationRegistry} 
       startMenuItems={startMenuItems} 
     />
   );

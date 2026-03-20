@@ -10,28 +10,30 @@ export interface WindowConfig {
   isMaximized?: boolean
   component: string
   props?: any
+  // New properties from registry
+  icon?: string
+  resizable?: boolean
+  minWidth?: number
+  minHeight?: number
+  maximizable?: boolean
 }
 
 export type StartMenuItem = {
-  icon?: string
-  label?: string
-  action?: () => void
-  type?: "separator"
-  windowConfig?: WindowConfig
+  label: string
+  component: string
+  type?: "item"
+} | {
+  type: "separator"
+} | {
+  label: string
+  icon: string
+  action: () => void
+  type: "action"
 }
 
-export interface PersistentWindowState {
+export interface PersistentWindowState extends WindowConfig {
   id: string
-  title: string
-  width: number
-  height: number
-  x: number
-  y: number
-  isMinimized: boolean
-  isMaximized: boolean
   zIndex: number
-  component: string
-  props?: any
   // Store original dimensions for restore
   originalWidth: number
   originalHeight: number
@@ -42,3 +44,16 @@ export interface PersistentWindowState {
 export interface WindowState extends Omit<PersistentWindowState, "component"> {
   component: React.ComponentType<any>
 }
+
+export interface Application {
+  component: React.ComponentType<any>
+  icon: string
+  width: number
+  height: number
+  minWidth?: number
+  minHeight?: number
+  resizable?: boolean
+  maximizable?: boolean
+}
+
+export type ApplicationRegistry = Record<string, Application>

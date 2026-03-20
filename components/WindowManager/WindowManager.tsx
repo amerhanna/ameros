@@ -6,16 +6,20 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
-import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState } from '@/types/window';
+import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState, ApplicationRegistry } from '@/types/window';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface WindowManagerProps {
   children?: React.ReactNode;
-  registry?: Record<string, React.ComponentType<any>>;
+  applicationRegistry?: ApplicationRegistry;
   startMenuItems?: StartMenuItem[];
 }
 
-export default function WindowManager({ children, registry = {}, startMenuItems = [] }: WindowManagerProps) {
+export default function WindowManager({ 
+  children, 
+  applicationRegistry = {}, 
+  startMenuItems = [] 
+}: WindowManagerProps) {
   const [persistentWindows, setPersistentWindows] = useLocalStorage<PersistentWindowState[]>('ameros-windows', []);
   const [activeWindowId, setActiveWindowId] = useLocalStorage<string | null>('ameros-active-window', null);
   const [nextZIndex, setNextZIndex] = useLocalStorage<number>('ameros-next-zindex', 1);
@@ -31,31 +35,49 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
   const windows = useMemo(() => {
     if (!mounted) return [];
     return persistentWindows.map((pw) => {
-      const ComponentClass = registry[pw.component];
+      const app = applicationRegistry[pw.component];
       return {
         ...pw,
-        component: ComponentClass || (() => <div>Component {pw.component} not found</div>),
+        component: app?.component || (() => <div className="p-4 bg-white border border-red-500 text-red-500">Component {pw.component} not found</div>),
       } as WindowState;
     });
-  }, [persistentWindows, registry, mounted]);
+  }, [persistentWindows, applicationRegistry, mounted]);
 
   const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
   const openWindow = useCallback(
-    (windowConfig: WindowConfig) => {
+    (config: Partial<WindowConfig> & { component: string }) => {
+      const app = applicationRegistry[config.component];
+      if (!app) {
+        console.error(`Application ${config.component} not found in registry`);
+        return null;
+      }
+
       const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const newWindow: PersistentWindowState = {
-        ...windowConfig,
         id,
-        isMinimized: windowConfig.isMinimized ?? false,
-        isMaximized: windowConfig.isMaximized ?? false,
+        title: config.title || config.component,
+        component: config.component,
+        width: config.width || app.width,
+        height: config.height || app.height,
+        x: config.x ?? (100 + (persistentWindows.length * 20) % 200),
+        y: config.y ?? (100 + (persistentWindows.length * 20) % 200),
+        isMinimized: config.isMinimized ?? false,
+        isMaximized: config.isMaximized ?? false,
         zIndex: nextZIndex,
-        component: windowConfig.component,
-        originalWidth: windowConfig.width,
-        originalHeight: windowConfig.height,
-        originalX: windowConfig.x,
-        originalY: windowConfig.y,
+        props: config.props,
+        // Registry defaults
+        icon: app.icon,
+        resizable: app.resizable ?? true,
+        minWidth: app.minWidth,
+        minHeight: app.minHeight,
+        maximizable: app.maximizable ?? true,
+        // Restore dimensions
+        originalWidth: config.width || app.width,
+        originalHeight: config.height || app.height,
+        originalX: config.x ?? 100,
+        originalY: config.y ?? 100,
       };
 
       setPersistentWindows((prev) => [...prev, newWindow]);
@@ -64,7 +86,7 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
 
       return id;
     },
-    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [nextZIndex, applicationRegistry, persistentWindows.length, setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
   const closeWindow = useCallback(
@@ -144,6 +166,26 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
     [setPersistentWindows],
   );
 
+  const resizeWindow = useCallback(
+    (id: string, width: number, height: number, x?: number, y?: number) => {
+      setPersistentWindows((prev) =>
+        prev.map((w) => {
+          if (w.id === id && !w.isMaximized) {
+            return { 
+              ...w, 
+              width, 
+              height,
+              x: x !== undefined ? x : w.x,
+              y: y !== undefined ? y : w.y
+            };
+          }
+          return w;
+        }),
+      );
+    },
+    [setPersistentWindows],
+  );
+
   const handleTaskbarWindowSelect = useCallback(
     (id: string) => {
       const window = windows.find((w) => w.id === id);
@@ -178,6 +220,7 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
             key={window.id}
             id={window.id}
             title={window.title}
+            icon={window.icon}
             width={window.width}
             height={window.height}
             x={window.x}
@@ -186,11 +229,16 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
             isMaximized={window.isMaximized}
             isActive={effectiveActiveWindowId === window.id}
             zIndex={window.zIndex}
+            resizable={window.resizable}
+            minWidth={window.minWidth}
+            minHeight={window.minHeight}
+            maximizable={window.maximizable}
             onMinimize={minimizeWindow}
             onMaximize={maximizeWindow}
             onClose={closeWindow}
             onFocus={focusWindow}
             onMove={moveWindow}
+            onResize={resizeWindow}
           >
             <WindowComponent {...window.props} />
           </Window>
@@ -198,7 +246,13 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
       })}
 
       {/* Start Menu */}
-      <StartMenu isOpen={isStartMenuOpen} onClose={closeStartMenu} onOpenWindow={openWindow} items={startMenuItems} />
+      <StartMenu 
+        isOpen={isStartMenuOpen} 
+        onClose={closeStartMenu} 
+        onOpenWindow={openWindow} 
+        items={startMenuItems}
+        applicationRegistry={applicationRegistry}
+      />
 
       {/* Taskbar */}
       <Taskbar
