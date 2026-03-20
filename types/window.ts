@@ -20,7 +20,7 @@ export type StartMenuItem = {
   windowConfig?: WindowConfig
 }
 
-export interface WindowState {
+export interface PersistentWindowState {
   id: string
   title: string
   width: number
@@ -30,11 +30,15 @@ export interface WindowState {
   isMinimized: boolean
   isMaximized: boolean
   zIndex: number
-  component: React.ComponentType<any>
+  component: string
   props?: any
   // Store original dimensions for restore
   originalWidth: number
   originalHeight: number
   originalX: number
   originalY: number
+}
+
+export interface WindowState extends Omit<PersistentWindowState, "component"> {
+  component: React.ComponentType<any>
 }

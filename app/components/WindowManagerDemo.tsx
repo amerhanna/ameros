@@ -16,68 +16,68 @@ const componentRegistry = {
 
 const startMenuItems: StartMenuItem[] = [
   {
-    icon: "📄",
-    label: "Text Editor",
+    icon: '📄',
+    label: 'Text Editor',
     windowConfig: {
-      title: "Text Editor",
+      title: 'Text Editor',
       width: 500,
       height: 350,
       x: 200,
       y: 150,
-      component: "TextEditor",
+      component: 'TextEditor',
     },
   },
   {
-    icon: "🧮",
-    label: "Calculator",
+    icon: '🧮',
+    label: 'Calculator',
     windowConfig: {
-      title: "Calculator",
+      title: 'Calculator',
       width: 250,
-      height: 300,
+      height: 310,
       x: 300,
       y: 200,
-      component: "Calculator",
+      component: 'Calculator',
     },
   },
   {
-    icon: "📁",
-    label: "File Explorer",
+    icon: '📁',
+    label: 'File Explorer',
     windowConfig: {
-      title: "File Explorer",
+      title: 'File Explorer',
       width: 400,
       height: 400,
       x: 150,
       y: 100,
-      component: "FileExplorer",
+      component: 'FileExplorer',
     },
   },
   {
-    icon: "🎨",
-    label: "Demo Application",
+    icon: '🎨',
+    label: 'Demo Application',
     windowConfig: {
-      title: "Demo Application",
+      title: 'Demo Application',
       width: 400,
       height: 300,
       x: 100,
       y: 100,
-      component: "DemoApp",
-      props: { title: "My Demo App" },
+      component: 'DemoApp',
+      props: { title: 'My Demo App' },
     },
   },
-  { type: "separator" },
+  { type: 'separator' },
   {
-    icon: "⚙️",
-    label: "Settings",
+    icon: '⚙️',
+    label: 'Settings',
     action: () => {
-      console.log("Settings clicked");
+      console.log('Settings clicked');
     },
   },
-  { type: "separator" },
+  { type: 'separator' },
   {
-    icon: "🔌",
-    label: "Shut Down...",
+    icon: '🔌',
+    label: 'Shut Down...',
     action: () => {
-      console.log("Shut down clicked");
+      console.log('Shut down clicked');
     },
   },
 ];

@@ -2,11 +2,12 @@
 
 import type React from 'react';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
-import type { WindowState, StartMenuItem, WindowConfig } from '@/types/window';
+import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState } from '@/types/window';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface WindowManagerProps {
   children?: React.ReactNode;
@@ -15,62 +16,79 @@ interface WindowManagerProps {
 }
 
 export default function WindowManager({ children, registry = {}, startMenuItems = [] }: WindowManagerProps) {
-  const [windows, setWindows] = useState<WindowState[]>([]);
-  const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
-  const [nextZIndex, setNextZIndex] = useState(1);
+  const [persistentWindows, setPersistentWindows] = useLocalStorage<PersistentWindowState[]>('ameros-windows', []);
+  const [activeWindowId, setActiveWindowId] = useLocalStorage<string | null>('ameros-active-window', null);
+  const [nextZIndex, setNextZIndex] = useLocalStorage<number>('ameros-next-zindex', 1);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Handle hydration mismatch by only rendering windows after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Map persistent state to full window state with component references
+  const windows = useMemo(() => {
+    if (!mounted) return [];
+    return persistentWindows.map((pw) => {
+      const ComponentClass = registry[pw.component];
+      return {
+        ...pw,
+        component: ComponentClass || (() => <div>Component {pw.component} not found</div>),
+      } as WindowState;
+    });
+  }, [persistentWindows, registry, mounted]);
+
+  const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
   const openWindow = useCallback(
     (windowConfig: WindowConfig) => {
       const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Get component from registry
-      const ComponentClass = registry[windowConfig.component];
-
-      if (!ComponentClass) {
-        console.warn(`Component "${windowConfig.component}" not found in registry`);
-        return;
-      }
-
-      const newWindow: WindowState = {
+      const newWindow: PersistentWindowState = {
         ...windowConfig,
         id,
         isMinimized: windowConfig.isMinimized ?? false,
         isMaximized: windowConfig.isMaximized ?? false,
         zIndex: nextZIndex,
-        component: ComponentClass,
+        component: windowConfig.component,
         originalWidth: windowConfig.width,
         originalHeight: windowConfig.height,
         originalX: windowConfig.x,
         originalY: windowConfig.y,
       };
 
-      setWindows((prev) => [...prev, newWindow]);
+      setPersistentWindows((prev) => [...prev, newWindow]);
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
 
       return id;
     },
-    [nextZIndex],
+    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
-  const closeWindow = useCallback((id: string) => {
-    setWindows((prev) => prev.filter((w) => w.id !== id));
-    setActiveWindowId((prev) => (prev === id ? null : prev));
-  }, []);
+  const closeWindow = useCallback(
+    (id: string) => {
+      setPersistentWindows((prev) => prev.filter((w) => w.id !== id));
+      setActiveWindowId((prev) => (prev === id ? null : prev));
+    },
+    [setPersistentWindows, setActiveWindowId],
+  );
 
-  const minimizeWindow = useCallback((id: string) => {
-    setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)));
-    setActiveWindowId((prev) => (prev === id ? null : prev));
-  }, []);
+  const minimizeWindow = useCallback(
+    (id: string) => {
+      setPersistentWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)));
+      setActiveWindowId((prev) => (prev === id ? null : prev));
+    },
+    [setPersistentWindows, setActiveWindowId],
+  );
 
   const maximizeWindow = useCallback(
     (id: string) => {
-      setWindows((prev) =>
+      setPersistentWindows((prev) =>
         prev.map((w) => {
           if (w.id === id) {
             if (w.isMaximized) {
-              // Restore to original size and position
               return {
                 ...w,
                 isMaximized: false,
@@ -81,7 +99,6 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
                 zIndex: nextZIndex,
               };
             } else {
-              // Store current position as original if not already maximized
               return {
                 ...w,
                 isMaximized: true,
@@ -99,28 +116,33 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
     },
-    [nextZIndex],
+    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
   const focusWindow = useCallback(
     (id: string) => {
-      setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)));
+      setPersistentWindows((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)),
+      );
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
     },
-    [nextZIndex],
+    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
   );
 
-  const moveWindow = useCallback((id: string, x: number, y: number) => {
-    setWindows((prev) =>
-      prev.map((w) => {
-        if (w.id === id && !w.isMaximized) {
-          return { ...w, x, y };
-        }
-        return w;
-      }),
-    );
-  }, []);
+  const moveWindow = useCallback(
+    (id: string, x: number, y: number) => {
+      setPersistentWindows((prev) =>
+        prev.map((w) => {
+          if (w.id === id && !w.isMaximized) {
+            return { ...w, x, y };
+          }
+          return w;
+        }),
+      );
+    },
+    [setPersistentWindows],
+  );
 
   const handleTaskbarWindowSelect = useCallback(
     (id: string) => {
@@ -145,7 +167,9 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
   }, []);
 
   return (
-    <div className="h-screen bg-teal-600 overflow-hidden relative">
+    <div 
+      className="h-screen bg-teal-600 bg-[url('/win95.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative"
+    >
       {/* Render Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
@@ -160,7 +184,7 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
             y={window.y}
             isMinimized={window.isMinimized}
             isMaximized={window.isMaximized}
-            isActive={activeWindowId === window.id}
+            isActive={effectiveActiveWindowId === window.id}
             zIndex={window.zIndex}
             onMinimize={minimizeWindow}
             onMaximize={maximizeWindow}
@@ -179,7 +203,7 @@ export default function WindowManager({ children, registry = {}, startMenuItems 
       {/* Taskbar */}
       <Taskbar
         windows={windows}
-        activeWindowId={activeWindowId}
+        activeWindowId={effectiveActiveWindowId}
         onWindowSelect={handleTaskbarWindowSelect}
         onStartMenuToggle={toggleStartMenu}
         isStartMenuOpen={isStartMenuOpen}
