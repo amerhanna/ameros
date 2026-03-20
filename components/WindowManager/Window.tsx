@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { WindowContext } from './WindowContext';
 
 interface WindowProps {
   id: string;
@@ -64,6 +65,47 @@ export default function Window({
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
   const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const prevActiveRef = useRef(isActive);
+
+  const windowContextValue = useMemo(
+    () => ({
+      id,
+      isMaximized,
+      isMinimized: !!isMinimized,
+      x,
+      y,
+      width,
+      height,
+      maximize: (e?: React.MouseEvent | React.TouchEvent) => {
+        e?.stopPropagation();
+        onMaximize?.(id);
+      },
+      minimize: (e?: React.MouseEvent | React.TouchEvent) => {
+        e?.stopPropagation();
+        onMinimize?.(id);
+      },
+      restore: (e?: React.MouseEvent | React.TouchEvent) => {
+        e?.stopPropagation();
+        if (isMaximized) {
+          onMaximize?.(id);
+        } else if (isMinimized) {
+          onFocus?.(id);
+        }
+      },
+      move: (e: React.MouseEvent | React.TouchEvent | undefined, x?: number, y?: number) => {
+        e?.stopPropagation();
+        if (x !== undefined && y !== undefined) {
+          onMove?.(id, x, y);
+        }
+      },
+      resize: (e: React.MouseEvent | React.TouchEvent | undefined, width?: number, height?: number, x?: number, y?: number) => {
+        e?.stopPropagation();
+        if (width !== undefined && height !== undefined) {
+          onResize?.(id, width, height, x, y);
+        }
+      },
+    }),
+    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize],
+  );
 
   useEffect(() => {
     if (prevActiveRef.current && !isActive) {
@@ -207,9 +249,9 @@ export default function Window({
     }
   };
 
-  if (isMinimized) {
-    return null;
-  }
+  // if (isMinimized) {
+  //   return null;
+  // }
 
   const titleBarClass = isActive ? 'bg-blue-900 text-white' : 'bg-gray-500 text-gray-200';
   const buttonHoverClass = isActive ? 'hover:bg-blue-700' : 'hover:bg-gray-400';
@@ -221,6 +263,7 @@ export default function Window({
       style={{
         ...maximizedStyle,
         zIndex,
+        display: isMinimized ? 'none' : 'flex',
         borderTopColor: '#ffffff',
         borderLeftColor: '#ffffff',
         borderRightColor: '#808080',
@@ -302,7 +345,7 @@ export default function Window({
           borderBottomColor: '#ffffff',
         }}
       >
-        {children}
+        <WindowContext.Provider value={windowContextValue}>{children}</WindowContext.Provider>
       </div>
     </div>
   );
