@@ -7,8 +7,8 @@ import { WindowContext, type ChildWindowConfig } from './WindowContext';
 import MenuBar from './MenuBar';
 import type { MenuItemType } from './Menu';
 import type { WindowConfig } from '@/types/window';
-import { useWindowSelector } from '@/hooks/useWindowSelector';
-import { useWindowContext } from '@/hooks/useWindowContext';
+import { useWindowStateById } from '@/hooks/useGetWindowState';
+import { useWindowActions } from '@/hooks/useWindowActions';
 import { flushPersistence } from '@/lib/window-store';
 
 interface WindowProps {
@@ -48,7 +48,7 @@ function TitleBarButtons({
   buttonHoverClass: string;
   isMaximized: boolean;
 }) {
-  const { minimize, maximize, close } = useWindowContext();
+  const { minimize, maximize, close } = useWindowActions();
 
   return (
     <div className="flex gap-1 ml-2">
@@ -109,7 +109,7 @@ export default function Window({
   launchApp,
   openChildWindow,
 }: WindowProps) {
-  const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowSelector(
+  const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowStateById(
     id,
     (w) => ({
       x: w.x,

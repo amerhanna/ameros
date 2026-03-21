@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWindowContext } from '@/hooks/useWindowContext';
+import { useWindowActions } from '@/hooks/useWindowActions';
 import { useMessageBox } from '@/hooks/useMessageBox';
 import { Button } from '@/components/ui/button';
 
 export default function TestCloseApp() {
-  const { setBeforeClose } = useWindowContext();
+  const { setBeforeClose } = useWindowActions();
   const { showMessageBox } = useMessageBox();
   const [shouldPreventClose, setShouldPreventClose] = useState(true);
 

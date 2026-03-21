@@ -3,19 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useWindowContext } from '@/hooks/useWindowContext';
+import { useWindowActions } from '@/hooks/useWindowActions';
 
 type Resolver<T> = (value: T) => void;
 
 interface MessageBoxProps {
-  title: string;
   message: string;
   buttons: string[];
   onResolve: Resolver<string | null>;
 }
 
-function MessageBoxContent({ title, message, buttons, onResolve }: MessageBoxProps) {
-  const { close } = useWindowContext();
+function MessageBoxContent({ message, buttons, onResolve }: MessageBoxProps) {
+  const { close } = useWindowActions();
   const resolvedRef = useRef(false);
 
   const resolveOnce = useCallback(
@@ -70,7 +69,7 @@ interface InputBoxProps {
 }
 
 function InputBoxContent({ message, onResolve }: InputBoxProps) {
-  const { close } = useWindowContext();
+  const { close } = useWindowActions();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const resolvedRef = useRef(false);
@@ -136,7 +135,7 @@ function InputBoxContent({ message, onResolve }: InputBoxProps) {
 }
 
 export function useMessageBox() {
-  const { openChildWindow, getBounds } = useWindowContext();
+  const { openChildWindow, getBounds } = useWindowActions();
 
   const showMessageBox = useCallback(
     async (title: string, message: string, isModal = true, buttons: string[] = ['OK']) => {
@@ -150,7 +149,6 @@ export function useMessageBox() {
       return new Promise<string | null>((resolve) => {
         const Content = () => (
           <MessageBoxContent
-            title={title}
             message={message}
             buttons={safeButtons}
             onResolve={resolve}
