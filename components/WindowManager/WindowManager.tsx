@@ -2,7 +2,7 @@
 
 import type React from 'react';
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
 import Window from '@/components/WindowManager/Window';
 import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
@@ -10,6 +10,15 @@ import WindowContextMenu from '@/components/WindowManager/WindowContextMenu';
 import SplashScreen from '@/components/WindowManager/SplashScreen';
 import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState, ApplicationRegistry } from '@/types/window';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import {
+  initialize as initWindowStore,
+  getState as getWindowStoreState,
+  subscribe as subscribeWindowStore,
+  getUiSnapshot,
+  setPersistenceWriter,
+  setWindowsState,
+  updateWindow as updateWindowInStore,
+} from '@/lib/window-store';
 
 interface WindowManagerProps {
   children?: React.ReactNode;
@@ -42,16 +51,38 @@ export default function WindowManager({
   const beforeCloseHandlersRef = useRef<Record<string, () => boolean | Promise<boolean>>>({});
   // Store child window components (not serializable, so kept in ref)
   const childComponentsRef = useRef<Record<string, React.ComponentType<any>>>({});
+  const persistentRef = useRef(persistentWindows);
+  persistentRef.current = persistentWindows;
 
-  // Handle hydration mismatch by only rendering windows after mount
+  const managerSnap = useSyncExternalStore(
+    subscribeWindowStore,
+    getUiSnapshot,
+    () => 0,
+  );
+
+  // Hydrate in-memory store once on client; avoid reading localStorage before mount (Next.js)
   useEffect(() => {
+    initWindowStore(persistentRef.current);
     setMounted(true);
   }, []);
 
-  // Map persistent state to full window state with component references
+  useEffect(() => {
+    setPersistenceWriter((next) => setPersistentWindows(next));
+    return () => setPersistenceWriter(null);
+  }, [setPersistentWindows]);
+
+  // Cross-tab / external localStorage updates (and reconciling after debounced saves)
+  useEffect(() => {
+    if (!mounted) return;
+    if (JSON.stringify(persistentWindows) !== JSON.stringify(getWindowStoreState())) {
+      initWindowStore(persistentWindows);
+    }
+  }, [persistentWindows, mounted]);
+
+  // Map store state to full window state with component references (layout lives in the store)
   const windows = useMemo(() => {
     if (!mounted) return [];
-    return persistentWindows.map((pw) => {
+    return getWindowStoreState().map((pw) => {
       // Child windows use the component stored in the ref
       if (pw.childWindow && childComponentsRef.current[pw.id]) {
         return {
@@ -66,7 +97,7 @@ export default function WindowManager({
         component: app?.component || (() => <div className="p-4 bg-white border border-red-500 text-red-500">Component {pw.component} not found</div>),
       } as WindowState;
     });
-  }, [persistentWindows, applicationRegistry, mounted]);
+  }, [managerSnap, applicationRegistry, mounted]);
 
   const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
@@ -82,7 +113,7 @@ export default function WindowManager({
 
       const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      setPersistentWindows((prev) => {
+      setWindowsState((prev) => {
         const newWindow: PersistentWindowState = {
           id,
           title: config.title || config.component,
@@ -120,12 +151,11 @@ export default function WindowManager({
 
       return id;
     },
-    [nextZIndex, applicationRegistry, setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [nextZIndex, applicationRegistry, setActiveWindowId, setNextZIndex],
   );
 
   const closeWindow = useCallback(
     async (id: string) => {
-      // 1. Check dynamic handler (from useWindow) - these are refs so they are always current
       const dynamicHandler = beforeCloseHandlersRef.current[id];
       if (dynamicHandler) {
         const result = dynamicHandler();
@@ -133,38 +163,32 @@ export default function WindowManager({
         if (!allowed) return;
       }
 
-      setPersistentWindows((prev) => {
-        // 2. Check registry handler (static) using latest state
-        if (!dynamicHandler) {
-          const pWindow = prev.find((w) => w.id === id);
-          const app = pWindow ? applicationRegistry[pWindow.component] : null;
-          if (app?.beforeClose && !app.beforeClose()) return prev;
-        }
+      const prev = getWindowStoreState();
 
-        // 3. Find and close all child windows of this window using latest state
-        const childIds = prev
-          .filter((w) => w.parentWindowId === id)
-          .map((w) => w.id);
-        
-        // Cleanup refs (doing this inside setter is slightly unconventional but ensures sync)
-        delete beforeCloseHandlersRef.current[id];
-        delete childComponentsRef.current[id];
-        childIds.forEach((childId) => {
-          delete beforeCloseHandlersRef.current[childId];
-          delete childComponentsRef.current[childId];
-        });
+      if (!dynamicHandler) {
+        const pWindow = prev.find((w) => w.id === id);
+        const app = pWindow ? applicationRegistry[pWindow.component] : null;
+        if (app?.beforeClose && !app.beforeClose()) return;
+      }
 
-        const newWindows = prev.filter((w) => w.id !== id && w.parentWindowId !== id);
-        
-        // Update active window if the closed one was active
-        setActiveWindowId((prevActive) => 
-          (prevActive === id || childIds.includes(prevActive || '') ? null : prevActive)
-        );
+      const childIds = prev.filter((w) => w.parentWindowId === id).map((w) => w.id);
 
-        return newWindows;
+      delete beforeCloseHandlersRef.current[id];
+      delete childComponentsRef.current[id];
+      childIds.forEach((childId) => {
+        delete beforeCloseHandlersRef.current[childId];
+        delete childComponentsRef.current[childId];
       });
+
+      const newWindows = prev.filter((w) => w.id !== id && w.parentWindowId !== id);
+
+      setWindowsState(() => newWindows);
+
+      setActiveWindowId((prevActive) =>
+        prevActive === id || childIds.includes(prevActive || '') ? null : prevActive,
+      );
     },
-    [applicationRegistry, setPersistentWindows, setActiveWindowId],
+    [applicationRegistry, setActiveWindowId],
   );
 
   // Launch a registered application with optional config/launchArgs
@@ -202,7 +226,7 @@ export default function WindowManager({
 
       // Stack child above its parent and every other window (avoids stale nextZIndex vs focused parent)
       let childZIndex = 0;
-      setPersistentWindows((prev) => {
+      setWindowsState((prev) => {
         const maxZ = prev.length ? Math.max(...prev.map((w) => w.zIndex)) : 0;
         const parent = prev.find((w) => w.id === parentId);
         childZIndex = Math.max(maxZ + 1, (parent?.zIndex ?? 0) + 1);
@@ -240,7 +264,7 @@ export default function WindowManager({
 
       return id;
     },
-    [setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [setActiveWindowId, setNextZIndex],
   );
 
   const setWindowBeforeClose = useCallback((id: string, fn: (() => boolean | Promise<boolean>) | undefined) => {
@@ -253,15 +277,15 @@ export default function WindowManager({
 
   const minimizeWindow = useCallback(
     (id: string) => {
-      setPersistentWindows((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)));
+      setWindowsState((prev) => prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)));
       setActiveWindowId((prev) => (prev === id ? null : prev));
     },
-    [setPersistentWindows, setActiveWindowId],
+    [setActiveWindowId],
   );
 
   const maximizeWindow = useCallback(
     (id: string) => {
-      setPersistentWindows((prev) =>
+      setWindowsState((prev) =>
         prev.map((w) => {
           if (w.id === id) {
             if (w.isMaximized) {
@@ -292,22 +316,21 @@ export default function WindowManager({
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
     },
-    [nextZIndex, setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [nextZIndex, setActiveWindowId, setNextZIndex],
   );
 
   const focusWindow = useCallback(
     (id: string) => {
-      // Don't allow focusing a window that has a modal child open
-      const hasModalChild = persistentWindows.some(
-        (w) => w.parentWindowId === id && w.modal && !w.isMinimized
+      const store = getWindowStoreState();
+      const hasModalChild = store.some(
+        (w) => w.parentWindowId === id && w.modal && !w.isMinimized,
       );
       if (hasModalChild) {
-        // Focus the modal child instead
-        const modalChild = persistentWindows.find(
-          (w) => w.parentWindowId === id && w.modal && !w.isMinimized
+        const modalChild = store.find(
+          (w) => w.parentWindowId === id && w.modal && !w.isMinimized,
         );
         if (modalChild) {
-          setPersistentWindows((prev) =>
+          setWindowsState((prev) =>
             prev.map((w) => (w.id === modalChild.id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)),
           );
           setActiveWindowId(modalChild.id);
@@ -316,59 +339,39 @@ export default function WindowManager({
         return;
       }
 
-      setPersistentWindows((prev) =>
+      setWindowsState((prev) =>
         prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)),
       );
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
     },
-    [nextZIndex, persistentWindows, setPersistentWindows, setActiveWindowId, setNextZIndex],
+    [nextZIndex, setActiveWindowId, setNextZIndex],
   );
 
-  const moveWindow = useCallback(
-    (id: string, x: number, y: number) => {
-      setPersistentWindows((prev) =>
-        prev.map((w) => {
-          if (w.id === id && !w.isMaximized) {
-            return { 
-              ...w, 
-              x, 
-              y, 
-              originalX: x, 
-              originalY: y 
-            };
-          }
-          return w;
-        }),
-      );
-    },
-    [setPersistentWindows],
-  );
+  const moveWindow = useCallback((id: string, x: number, y: number) => {
+    const w = getWindowStoreState().find((win) => win.id === id);
+    if (!w || w.isMaximized) return;
+    updateWindowInStore(id, { x, y, originalX: x, originalY: y });
+  }, []);
 
   const resizeWindow = useCallback(
     (id: string, width: number, height: number, x?: number, y?: number) => {
-      setPersistentWindows((prev) =>
-        prev.map((w) => {
-          if (w.id === id && !w.isMaximized) {
-            const newX = x !== undefined ? x : w.x;
-            const newY = y !== undefined ? y : w.y;
-            return { 
-              ...w, 
-              width, 
-              height,
-              x: newX,
-              y: newY,
-              originalWidth: width,
-              originalHeight: height,
-              originalX: newX,
-              originalY: newY
-            };
-          }
-          return w;
-        }),
-      );
+      const w = getWindowStoreState().find((win) => win.id === id);
+      if (!w || w.isMaximized) return;
+      const newX = x !== undefined ? x : w.x;
+      const newY = y !== undefined ? y : w.y;
+      updateWindowInStore(id, {
+        width,
+        height,
+        x: newX,
+        y: newY,
+        originalWidth: width,
+        originalHeight: height,
+        originalX: newX,
+        originalY: newY,
+      });
     },
-    [setPersistentWindows],
+    [],
   );
 
   const handleTaskbarWindowSelect = useCallback(
@@ -413,25 +416,24 @@ export default function WindowManager({
   // Compute which windows are blocked by a modal child
   const blockedWindowIds = useMemo(() => {
     const blocked = new Set<string>();
-    persistentWindows.forEach((w) => {
+    getWindowStoreState().forEach((w) => {
       if (w.modal && w.parentWindowId && !w.isMinimized) {
         blocked.add(w.parentWindowId);
       }
     });
     return blocked;
-  }, [persistentWindows]);
+  }, [managerSnap]);
 
   // Filter windows for taskbar — exclude child windows
   const taskbarWindows = useMemo(() => {
-    return windows.filter((w) => !persistentWindows.find((pw) => pw.id === w.id)?.childWindow);
-  }, [windows, persistentWindows]);
+    return windows.filter((w) => !w.childWindow);
+  }, [windows]);
 
   return (
     <div className="h-screen bg-teal-600 bg-[url('/ameros-bg.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative">
       {/* Render Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;
-        const pw = persistentWindows.find((p) => p.id === window.id);
         const isBlocked = blockedWindowIds.has(window.id);
         return (
           <Window
@@ -439,20 +441,13 @@ export default function WindowManager({
             id={window.id}
             title={window.title}
             icon={window.icon}
-            width={window.width}
-            height={window.height}
-            x={window.x}
-            y={window.y}
-            isMinimized={window.isMinimized}
-            isMaximized={window.isMaximized}
             isActive={effectiveActiveWindowId === window.id}
-            zIndex={window.zIndex}
             resizable={window.resizable}
             minWidth={window.minWidth}
             minHeight={window.minHeight}
             maximizable={window.maximizable}
             minimizable={window.minimizable}
-            launchArgs={pw?.launchArgs}
+            launchArgs={window.launchArgs}
             isBlocked={isBlocked}
             onMinimize={minimizeWindow}
             onMaximize={maximizeWindow}
@@ -465,7 +460,7 @@ export default function WindowManager({
             launchApp={launchApp}
             openChildWindow={(config) => openChildWindow(window.id, config)}
           >
-            <WindowComponent {...(pw?.launchArgs || {})} />
+            <WindowComponent {...(window.launchArgs || {})} />
           </Window>
         );
       })}

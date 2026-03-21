@@ -7,19 +7,14 @@ import { WindowContext, type ChildWindowConfig } from './WindowContext';
 import MenuBar from './MenuBar';
 import type { MenuItemType } from './Menu';
 import type { WindowConfig } from '@/types/window';
+import { useWindowSelector } from '@/hooks/useWindowSelector';
+import { flushPersistence } from '@/lib/window-store';
 
 interface WindowProps {
   id: string;
   title?: string;
   icon?: string;
-  width?: number;
-  height?: number;
-  x?: number;
-  y?: number;
-  isMinimized?: boolean;
-  isMaximized?: boolean;
   isActive?: boolean;
-  zIndex?: number;
   resizable?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -45,14 +40,7 @@ export default function Window({
   id,
   title = 'Untitled',
   icon = '📁',
-  width = 800,
-  height = 600,
-  x = 100,
-  y = 100,
-  isMinimized = false,
-  isMaximized = false,
   isActive = false,
-  zIndex = 1,
   resizable = true,
   minWidth = 200,
   minHeight = 100,
@@ -73,6 +61,19 @@ export default function Window({
   launchApp,
   openChildWindow,
 }: WindowProps) {
+  const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowSelector(
+    id,
+    (w) => ({
+      x: w.x,
+      y: w.y,
+      width: w.width,
+      height: w.height,
+      isMinimized: !!w.isMinimized,
+      isMaximized: !!w.isMaximized,
+      zIndex: w.zIndex,
+    }),
+  );
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -215,6 +216,7 @@ export default function Window({
       setDragging(false);
       setResizing(false);
       setResizeDir(null);
+      flushPersistence();
     };
 
     if (dragging || resizing) {
