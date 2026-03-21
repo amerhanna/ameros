@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWindow } from "@/hooks/useWindow"
+import { useWindowContext } from "@/hooks/useWindowContext"
 import { Button } from "@/components/ui/button"
 
 // In-app Search panel component (not in the application registry)
 function SearchPanel() {
   const [searchText, setSearchText] = useState("");
-  const { close } = useWindow();
+  const { close } = useWindowContext();
 
   return (
     <div className="p-3 bg-gray-200">
@@ -52,7 +52,7 @@ interface TextEditorProps {
 }
 
 export default function TextEditor({ filePath }: TextEditorProps) {
-  const { openChildWindow, setMenuBar } = useWindow();
+  const { openChildWindow, setMenuBar } = useWindowContext();
   const [content, setContent] = useState("");
 
   const handleOpenSearch = () => {

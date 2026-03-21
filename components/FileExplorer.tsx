@@ -1,9 +1,9 @@
 "use client"
 
-import { useWindow } from "@/hooks/useWindow"
+import { useWindowContext } from "@/hooks/useWindowContext"
 
 export default function FileExplorer() {
-  const { launchApp } = useWindow();
+  const { launchApp } = useWindowContext();
 
   const handleOpenFile = (fileName: string) => {
     launchApp('TextEditor', { 

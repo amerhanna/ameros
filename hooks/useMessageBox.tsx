@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useWindow } from '@/hooks/useWindow';
+import { useWindowContext } from '@/hooks/useWindowContext';
 
 type Resolver<T> = (value: T) => void;
 
@@ -15,7 +15,7 @@ interface MessageBoxProps {
 }
 
 function MessageBoxContent({ title, message, buttons, onResolve }: MessageBoxProps) {
-  const { close } = useWindow();
+  const { close } = useWindowContext();
   const resolvedRef = useRef(false);
 
   const resolveOnce = useCallback(
@@ -70,7 +70,7 @@ interface InputBoxProps {
 }
 
 function InputBoxContent({ message, onResolve }: InputBoxProps) {
-  const { close } = useWindow();
+  const { close } = useWindowContext();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const resolvedRef = useRef(false);
@@ -136,7 +136,7 @@ function InputBoxContent({ message, onResolve }: InputBoxProps) {
 }
 
 export function useMessageBox() {
-  const { openChildWindow, getBounds } = useWindow();
+  const { openChildWindow, getBounds } = useWindowContext();
 
   const showMessageBox = useCallback(
     async (title: string, message: string, isModal = true, buttons: string[] = ['OK']) => {

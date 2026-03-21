@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button"
-import { useWindow } from '@/hooks/useWindow';
+import { useWindowContext } from '@/hooks/useWindowContext';
+import { useWindowSelector } from '@/hooks/useWindowSelector';
 import { useMenuBar } from '@/hooks/useMenuBar';
 import { useMessageBox } from '@/hooks/useMessageBox';
 import type { MenuItemType } from '@/components/WindowManager/Menu';
@@ -12,7 +13,15 @@ interface DemoAppProps {
 }
 
 export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
-  const { maximize, minimize, restore, move, resize, close, isMaximized, isMinimized, x, y, width, height, id } = useWindow();
+  const { maximize, minimize, restore, move, resize, close, id } = useWindowContext();
+  const { isMaximized, isMinimized, x, y, width, height } = useWindowSelector(id, (w) => ({
+    isMaximized: !!w.isMaximized,
+    isMinimized: !!w.isMinimized,
+    x: w.x,
+    y: w.y,
+    width: w.width,
+    height: w.height,
+  }));
   const { showMessageBox, showInputBox } = useMessageBox();
   const [count, setCount] = useState(0);
 

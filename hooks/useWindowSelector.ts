@@ -30,6 +30,9 @@ function ghostWindow(windowId: string): PersistentWindowState {
 /**
  * Subscribe to a single window with a selector. Re-renders only when the selected
  * slice changes (deep compare via JSON by default).
+ *
+ * WARNING: Use this hook ONLY for components that must visually move or resize.
+ * For buttons and logic, use `useWindowContext` instead.
  */
 export function useWindowSelector<T>(
   windowId: string,

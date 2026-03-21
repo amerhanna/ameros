@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useWindow } from './useWindow';
+import { useWindowContext } from './useWindowContext';
 import type { MenuItemType } from '@/components/WindowManager/Menu';
 
 export function useMenuBar(menu: MenuItemType[]) {
-  const { menuBar, setMenuBar } = useWindow();
+  const { menuBar, setMenuBar } = useWindowContext();
 
   useEffect(() => {
     // Only update if it's different to prevent loops
