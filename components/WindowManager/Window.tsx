@@ -7,19 +7,15 @@ import { WindowContext, type ChildWindowConfig } from './WindowContext';
 import MenuBar from './MenuBar';
 import type { MenuItemType } from './Menu';
 import type { WindowConfig } from '@/types/window';
+import { useWindowStateById } from '@/hooks/useGetWindowState';
+import { useWindowActions } from '@/hooks/useWindowActions';
+import { flushPersistence } from '@/lib/window-store';
 
 interface WindowProps {
   id: string;
   title?: string;
   icon?: string;
-  width?: number;
-  height?: number;
-  x?: number;
-  y?: number;
-  isMinimized?: boolean;
-  isMaximized?: boolean;
   isActive?: boolean;
-  zIndex?: number;
   resizable?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -41,18 +37,58 @@ interface WindowProps {
   openChildWindow?: (config: ChildWindowConfig) => string | null;
 }
 
+function TitleBarButtons({
+  minimizable,
+  maximizable,
+  buttonHoverClass,
+  isMaximized,
+}: {
+  minimizable: boolean;
+  maximizable: boolean;
+  buttonHoverClass: string;
+  isMaximized: boolean;
+}) {
+  const { minimize, maximize, close } = useWindowActions();
+
+  return (
+    <div className="flex gap-1 ml-2">
+      {(minimizable || maximizable) && (
+        <Button
+          variant="ghost"
+          className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
+          onClick={minimize}
+        >
+          _
+        </Button>
+      )}
+      {(minimizable || maximizable) && (
+        <Button
+          variant="ghost"
+          className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
+          onClick={(e) => {
+            if (!maximizable) return;
+            maximize(e);
+          }}
+        >
+          {isMaximized ? '❐' : '□'}
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
+        onClick={close}
+      >
+        ×
+      </Button>
+    </div>
+  );
+}
+
 export default function Window({
   id,
   title = 'Untitled',
   icon = '📁',
-  width = 800,
-  height = 600,
-  x = 100,
-  y = 100,
-  isMinimized = false,
-  isMaximized = false,
   isActive = false,
-  zIndex = 1,
   resizable = true,
   minWidth = 200,
   minHeight = 100,
@@ -73,6 +109,19 @@ export default function Window({
   launchApp,
   openChildWindow,
 }: WindowProps) {
+  const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowStateById(
+    id,
+    (w) => ({
+      x: w.x,
+      y: w.y,
+      width: w.width,
+      height: w.height,
+      isMinimized: !!w.isMinimized,
+      isMaximized: !!w.isMaximized,
+      zIndex: w.zIndex,
+    }),
+  );
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -81,59 +130,91 @@ export default function Window({
   const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [menuBar, setMenuBar] = useState<MenuItemType[] | undefined>();
   const prevActiveRef = useRef(isActive);
+  const isMaximizedRef = useRef(isMaximized);
+  const isMinimizedRef = useRef(!!isMinimized);
+  const boundsFallbackRef = useRef({ x, y, width, height });
+
+  useEffect(() => {
+    isMaximizedRef.current = isMaximized;
+    isMinimizedRef.current = !!isMinimized;
+    boundsFallbackRef.current = { x, y, width, height };
+  }, [isMaximized, isMinimized, x, y, width, height]);
+
+  const maximizeWindow = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      onMaximize?.(id);
+    },
+    [id, onMaximize],
+  );
+
+  const minimizeWindow = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      onMinimize?.(id);
+    },
+    [id, onMinimize],
+  );
+
+  const restoreWindow = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      if (isMaximizedRef.current) {
+        onMaximize?.(id);
+      } else if (isMinimizedRef.current) {
+        onFocus?.(id);
+      }
+    },
+    [id, onFocus, onMaximize],
+  );
+
+  const moveWindow = useCallback(
+    (e: React.MouseEvent | React.TouchEvent | undefined, nextX?: number, nextY?: number) => {
+      e?.stopPropagation();
+      if (nextX !== undefined && nextY !== undefined) {
+        onMove?.(id, nextX, nextY);
+      }
+    },
+    [id, onMove],
+  );
+
+  const resizeWindow = useCallback(
+    (e: React.MouseEvent | React.TouchEvent | undefined, nextWidth?: number, nextHeight?: number, nextX?: number, nextY?: number) => {
+      e?.stopPropagation();
+      if (nextWidth !== undefined && nextHeight !== undefined) {
+        onResize?.(id, nextWidth, nextHeight, nextX, nextY);
+      }
+    },
+    [id, onResize],
+  );
+
+  const closeWindow = useCallback(() => {
+    onClose?.(id);
+  }, [id, onClose]);
+
+  const getBounds = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) {
+      return boundsFallbackRef.current;
+    }
+    return {
+      x: el.offsetLeft,
+      y: el.offsetTop,
+      width: el.offsetWidth,
+      height: el.offsetHeight,
+    };
+  }, []);
 
   const windowContextValue = useMemo(
     () => ({
       id,
-      isMaximized,
-      isMinimized: !!isMinimized,
-      x,
-      y,
-      width,
-      height,
-      getBounds: () => {
-        const el = containerRef.current;
-        if (!el) {
-          return { x, y, width, height };
-        }
-        return {
-          x: el.offsetLeft,
-          y: el.offsetTop,
-          width: el.offsetWidth,
-          height: el.offsetHeight,
-        };
-      },
-      maximize: (e?: React.MouseEvent | React.TouchEvent) => {
-        e?.stopPropagation();
-        onMaximize?.(id);
-      },
-      minimize: (e?: React.MouseEvent | React.TouchEvent) => {
-        e?.stopPropagation();
-        onMinimize?.(id);
-      },
-      restore: (e?: React.MouseEvent | React.TouchEvent) => {
-        e?.stopPropagation();
-        if (isMaximized) {
-          onMaximize?.(id);
-        } else if (isMinimized) {
-          onFocus?.(id);
-        }
-      },
-      move: (e: React.MouseEvent | React.TouchEvent | undefined, x?: number, y?: number) => {
-        e?.stopPropagation();
-        if (x !== undefined && y !== undefined) {
-          onMove?.(id, x, y);
-        }
-      },
-      resize: (e: React.MouseEvent | React.TouchEvent | undefined, width?: number, height?: number, x?: number, y?: number) => {
-        e?.stopPropagation();
-        if (width !== undefined && height !== undefined) {
-          onResize?.(id, width, height, x, y);
-        }
-      },
-      close: () => {
-        onClose?.(id);
-      },
+      getBounds,
+      maximize: maximizeWindow,
+      minimize: minimizeWindow,
+      restore: restoreWindow,
+      move: moveWindow,
+      resize: resizeWindow,
+      close: closeWindow,
       launchArgs,
       menuBar,
       setMenuBar,
@@ -147,7 +228,7 @@ export default function Window({
         return openChildWindow?.(config) ?? null;
       },
     }),
-    [id, isMaximized, isMinimized, x, y, width, height, onMaximize, onMinimize, onFocus, onMove, onResize, menuBar, onClose, setBeforeClose, launchArgs, launchApp, openChildWindow],
+    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, menuBar, setBeforeClose, launchApp, openChildWindow],
   );
 
   useEffect(() => {
@@ -215,6 +296,7 @@ export default function Window({
       setDragging(false);
       setResizing(false);
       setResizeDir(null);
+      flushPersistence();
     };
 
     if (dragging || resizing) {
@@ -300,6 +382,7 @@ export default function Window({
   const buttonHoverClass = isActive ? 'hover:bg-blue-700' : 'hover:bg-gray-400';
 
   return (
+    <WindowContext.Provider value={windowContextValue}>
     <div
       ref={containerRef}
       className="absolute bg-gray-200 border-2 border-white shadow-md flex flex-col overflow-hidden"
@@ -343,43 +426,12 @@ export default function Window({
           </span>
           <span className="text-sm font-bold truncate">{title}</span>
         </div>
-        <div className="flex gap-1 ml-2">
-          {(minimizable || maximizable) && (
-            <Button
-              variant="ghost"
-              className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMinimize?.(id);
-              }}
-            >
-              _
-            </Button>
-          )}
-          {(minimizable || maximizable) && (
-            <Button
-              variant="ghost"
-              className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!maximizable) return;
-                onMaximize?.(id);
-              }}
-            >
-              {isMaximized ? '❐' : '□'}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose?.(id);
-            }}
-          >
-            ×
-          </Button>
-        </div>
+        <TitleBarButtons
+          minimizable={minimizable}
+          maximizable={maximizable}
+          buttonHoverClass={buttonHoverClass}
+          isMaximized={isMaximized}
+        />
       </div>
 
       {/* Menu Bar */}
@@ -399,7 +451,7 @@ export default function Window({
           borderBottomColor: '#ffffff',
         }}
       >
-        <WindowContext.Provider value={windowContextValue}>{children}</WindowContext.Provider>
+        {children}
         {/* Modal blocking overlay */}
         {isBlocked && (
           <div 
@@ -413,5 +465,6 @@ export default function Window({
         )}
       </div>
     </div>
+    </WindowContext.Provider>
   );
 }

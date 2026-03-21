@@ -22,7 +22,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 				const valueToStore = value instanceof Function ? value(prevValue) : value;
 				if (typeof window !== 'undefined') {
 					localStorage.setItem(key, JSON.stringify(valueToStore));
-					window.dispatchEvent(new Event('local-storage'));
+					window.dispatchEvent(new CustomEvent('local-storage', { detail: { key } }));
 				}
 				return valueToStore;
 			});
@@ -36,8 +36,15 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 	};
 
 	useEffect(() => {
-		const handleStorageChange = () => {
+		const handleStorageChange = (event: StorageEvent | Event) => {
 			if (isInternalUpdate.current) return;
+			if (event instanceof StorageEvent) {
+				if (event.key && event.key !== key) return;
+			} else {
+				const customEvent = event as CustomEvent<{ key?: string }>;
+				const changedKey = customEvent.detail?.key;
+				if (changedKey && changedKey !== key) return;
+			}
 			setStoredValue(readValue());
 		};
 
