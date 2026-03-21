@@ -8,6 +8,7 @@ import Taskbar from '@/components/WindowManager/Taskbar';
 import StartMenu from '@/components/WindowManager/StartMenu';
 import WindowContextMenu from '@/components/WindowManager/WindowContextMenu';
 import SplashScreen from '@/components/WindowManager/SplashScreen';
+import { SystemActionsContext } from '@/components/WindowManager/WindowContext';
 import type { WindowState, StartMenuItem, WindowConfig, PersistentWindowState, ApplicationRegistry } from '@/types/window';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import {
@@ -429,7 +430,15 @@ export default function WindowManager({
     return windows.filter((w) => !w.childWindow);
   }, [windows]);
 
+  const systemActionsContextValue = useMemo(
+    () => ({
+      launchApp,
+    }),
+    [launchApp],
+  );
+
   return (
+    <SystemActionsContext.Provider value={systemActionsContextValue}>
     <div className="h-screen bg-teal-600 bg-[url('/ameros-bg.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative">
       {/* Render Windows */}
       {windows.map((window) => {
@@ -457,7 +466,6 @@ export default function WindowManager({
             onResize={resizeWindow}
             onContextMenu={openWindowMenu}
             setBeforeClose={(fn) => setWindowBeforeClose(window.id, fn)}
-            launchApp={launchApp}
             openChildWindow={(config) => openChildWindow(window.id, config)}
           >
             <WindowComponent {...(window.launchArgs || {})} />
@@ -507,5 +515,6 @@ export default function WindowManager({
       {/* Splash Screen Overlay */}
       {(!mounted || !isSplashFinished) && <SplashScreen onFinish={() => setIsSplashFinished(true)} minDuration={1500} />}
     </div>
+    </SystemActionsContext.Provider>
   );
 }

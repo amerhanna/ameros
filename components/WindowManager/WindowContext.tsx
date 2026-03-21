@@ -36,10 +36,14 @@ export interface WindowContextType {
   setMenuBar: (menu: MenuItemType[]) => void;
   /** Return false (or a Promise that resolves false) to cancel closing */
   setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
-  // Launch a registered application (like running an .exe with arguments)
-  launchApp: (component: string, config?: Partial<WindowConfig>) => string | null;
   // Open an in-app child window (not in the registry — the app provides the component inline)
   openChildWindow: (config: ChildWindowConfig) => string | null;
 }
 
+export interface SystemActionsContextType {
+  // Launch a registered application (like running an .exe with arguments)
+  launchApp: (component: string, config?: Partial<WindowConfig>) => string | null;
+}
+
 export const WindowContext = createContext<WindowContextType | null>(null);
+export const SystemActionsContext = createContext<SystemActionsContextType | null>(null);

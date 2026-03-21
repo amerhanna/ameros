@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { WindowContext, type ChildWindowConfig } from './WindowContext';
 import MenuBar from './MenuBar';
 import type { MenuItemType } from './Menu';
-import type { WindowConfig } from '@/types/window';
 import { useWindowStateById } from '@/hooks/useGetWindowState';
 import { useWindowActions } from '@/hooks/useWindowActions';
 import { flushPersistence } from '@/lib/window-store';
@@ -33,7 +32,6 @@ interface WindowProps {
   onBlur?: (id: string) => void;
   onContextMenu?: (id: string, x: number, y: number) => void;
   setBeforeClose?: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
-  launchApp?: (component: string, config?: Partial<WindowConfig>) => string | null;
   openChildWindow?: (config: ChildWindowConfig) => string | null;
 }
 
@@ -106,7 +104,6 @@ export default function Window({
   onBlur,
   onContextMenu,
   setBeforeClose,
-  launchApp,
   openChildWindow,
 }: WindowProps) {
   const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowStateById(
@@ -221,14 +218,11 @@ export default function Window({
       setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => {
         setBeforeClose?.(fn);
       },
-      launchApp: (component: string, config?: Partial<WindowConfig>) => {
-        return launchApp?.(component, config) ?? null;
-      },
       openChildWindow: (config: ChildWindowConfig) => {
         return openChildWindow?.(config) ?? null;
       },
     }),
-    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, menuBar, setBeforeClose, launchApp, openChildWindow],
+    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, menuBar, setBeforeClose, openChildWindow],
   );
 
   useEffect(() => {
