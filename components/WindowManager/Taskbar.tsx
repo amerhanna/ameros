@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import type { WindowState } from '@/types/window';
+import { Button } from "@/components/ui/button";
+import type { WindowState } from "@/types/window";
 
 interface TaskbarProps {
-  windows: WindowState[]
-  activeWindowId: string | null
-  onWindowSelect: (id: string) => void
-  onStartMenuToggle: () => void
-  isStartMenuOpen: boolean
-  onContextMenu: (id: string, x: number, y: number) => void
+  windows: WindowState[];
+  activeWindowId: string | null;
+  onWindowSelect: (id: string) => void;
+  onStartMenuToggle: () => void;
+  isStartMenuOpen: boolean;
+  onContextMenu: (id: string, x: number, y: number) => void;
 }
 
 export default function Taskbar({
@@ -25,7 +25,7 @@ export default function Taskbar({
       {/* Start Button */}
       <Button
         variant="ghost"
-        className={`h-6 px-3 text-sm border border-gray-400 font-bold ${
+        className={`h-6 px-3 text-sm border border-black rounded-none font-bold ${
           isStartMenuOpen ? "bg-gray-400 border-gray-500 shadow-inner" : "bg-gray-300 hover:bg-gray-200"
         }`}
         onClick={onStartMenuToggle}
@@ -61,5 +61,5 @@ export default function Taskbar({
         <div className="text-sm">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
       </div>
     </div>
-  )
+  );
 }
