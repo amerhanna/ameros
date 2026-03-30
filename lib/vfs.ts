@@ -185,14 +185,24 @@ class VFS {
     }
 
     const results: VFSNode[] = []
-    for await (const entry of currentHandle.values()) {
-      results.push({
-        path: `${letter}:${subPath === "/" ? "" : subPath}/${entry.name}`,
-        name: entry.name,
-        type: entry.kind === "directory" ? "dir" : "file",
-        lastModified: Date.now(),
-        handle: entry,
-      })
+    
+    try {
+      for await (const entry of (currentHandle as any).values()) {
+        try {
+          results.push({
+            path: `${letter}:${subPath === "/" ? "" : subPath}/${entry.name}`,
+            name: entry.name,
+            type: entry.kind === "directory" ? "dir" : "file",
+            lastModified: Date.now(),
+            handle: entry,
+          })
+        } catch (entryErr) {
+          console.error(`VFS: Failed to process entry in ${letter}:${subPath}. This is likely due to illegal Windows filenames (e.g. leading spaces).`, entryErr)
+        }
+      }
+    } catch (enumErr) {
+      console.error(`VFS: Directory enumeration failed for ${letter}:${subPath}.`, enumErr)
+      throw new Error("Unable to read directory content. Windows may be blocking access to these filenames.")
     }
     return results
   }
@@ -401,56 +411,64 @@ class VFS {
     const node = await this.getNode(normalizedPath)
     if (!node) throw new Error("Source not found")
 
-    const parentPath = normalizedPath.substring(0, normalizedPath.lastIndexOf("/")) || (normalizedPath.includes(":") ? normalizedPath.split(":")[0] + ":" : "/")
+    const lastSlash = normalizedPath.lastIndexOf("/")
+    const parentPath = normalizedPath.substring(0, lastSlash) || (normalizedPath.includes(":") ? normalizedPath.split(":")[0] + ":" : "/")
     const newPath = this.normalize(`${parentPath}/${newName}`)
 
     if (node.handle) {
-      // External rename/move
       if (node.type === "file") {
-        await (node.handle as any).move(newName)
+        if ((node.handle as any).move) {
+          await (node.handle as any).move(newName)
+          return
+        }
       } else {
-         // Folders are tricky in current API, might need recursive copy+delete if move() isn't supported for dirs
-         // but Chrome supports it now.
-         await (node.handle as any).move(newName)
+        // Folders on external handles don't support .move()
+        // We must bridge this with copy + delete
+        await this.copy(normalizedPath, newPath)
+        await this.delete(normalizedPath)
+        return
       }
-      return
+      throw new Error("Native rename not supported for this handle")
     }
 
     // IDB Rename (Recursive for dirs)
+    // We collect all nodes first to avoid cursor mutation issues
     const transaction = this.db!.transaction(STORE_FILES, "readwrite")
     const store = transaction.objectStore(STORE_FILES)
-    
-    if (node.type === "file") {
-      const newNode = { ...node, path: newPath, name: newName }
-      await store.delete(normalizedPath)
-      await store.put(newNode)
-    } else {
-      const prefix = normalizedPath + "/"
-      const request = store.openCursor()
-      await new Promise<void>((resolve, reject) => {
-        request.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result
-          if (cursor) {
-            const oldChildPath = cursor.value.path
-            if (oldChildPath === normalizedPath) {
-               const newNode = { ...cursor.value, path: newPath, name: newName }
-               cursor.delete()
-               store.put(newNode)
-            } else if (oldChildPath.startsWith(prefix)) {
-               const relative = oldChildPath.slice(prefix.length)
-               const newChildPath = newPath + "/" + relative
-               const newNode = { ...cursor.value, path: newChildPath }
-               cursor.delete()
-               store.put(newNode)
-            }
-            cursor.continue()
-          } else {
-            resolve()
+    const prefix = normalizedPath + "/"
+    const nodesToUpdate: { oldPath: string, newNode: VFSNode }[] = []
+
+    const cursorRequest = store.openCursor()
+    await new Promise<void>((resolve, reject) => {
+        cursorRequest.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result
+        if (cursor) {
+          const oldChildPath = cursor.value.path
+          if (oldChildPath === normalizedPath) {
+             nodesToUpdate.push({ oldPath: oldChildPath, newNode: { ...cursor.value, path: newPath, name: newName } })
+          } else if (oldChildPath.startsWith(prefix)) {
+             const relative = oldChildPath.slice(prefix.length)
+             const newChildPath = newPath + "/" + relative
+             nodesToUpdate.push({ oldPath: oldChildPath, newNode: { ...cursor.value, path: newChildPath } })
           }
+          cursor.continue()
+        } else {
+          resolve()
         }
-        request.onerror = () => reject(request.error)
-      })
+      }
+      cursorRequest.onerror = () => reject(cursorRequest.error)
+    })
+
+    // Apply collected updates
+    for (const update of nodesToUpdate) {
+      await store.delete(update.oldPath)
+      await store.put(update.newNode)
     }
+
+    return new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
   }
 
   async copy(src: string, dest: string) {
@@ -472,21 +490,29 @@ class VFS {
   }
 
   async move(src: string, dest: string) {
-    // Try fast rename if same drive
     const srcDrive = src.split(":")[0]
     const destDrive = dest.split(":")[0]
+    const srcNode = await this.getNode(src)
+    if (!srcNode) throw new Error("Source not found")
     
-    if (srcDrive === destDrive) {
+    // Within same external drive
+    if (srcDrive === destDrive && srcNode.handle) {
         const newName = dest.split("/").pop()!
-        // Check if just a rename in same parent
-        const srcParent = src.substring(0, src.lastIndexOf("/"))
-        const destParent = dest.substring(0, dest.lastIndexOf("/"))
-        if (srcParent === destParent) {
-            await this.rename(src, newName)
-            return
+        const destParentPath = dest.substring(0, dest.lastIndexOf("/")) || (dest.includes(":") ? dest.split(":")[0] + ":" : "/")
+        const destParentNode = await this.getNode(destParentPath)
+
+        // Native File System API supports atomic move for files if both handle and parent are known
+        if (srcNode.type === "file" && (srcNode.handle as any).move && destParentNode?.handle) {
+             await (srcNode.handle as any).move(destParentNode.handle, newName)
+             return
         }
+        // Folder or no native support fallback
+        await this.copy(src, dest)
+        await this.delete(src)
+        return
     }
 
+    // Default: Bridge Copy & Delete
     await this.copy(src, dest)
     await this.delete(src)
   }
