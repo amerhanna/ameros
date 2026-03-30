@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useWindowActions } from "@/hooks/useWindowActions"
-import { Button } from "@/components/ui/button"
-import { vfs } from "@/lib/vfs"
-import { toast } from "sonner"
+import { useState, useEffect } from "react";
+import { useWindowActions } from "@/hooks/useWindowActions";
+import { Button } from "@/components/ui/button";
+import { vfs } from "@/lib/vfs";
+import { toast } from "sonner";
 
 // In-app Search panel component (not in the application registry)
 function SearchPanel() {
@@ -30,7 +30,7 @@ function SearchPanel() {
             className="px-4 py-1 h-7 text-sm bg-gray-300 border border-gray-500 hover:bg-gray-400"
             onClick={() => {
               if (searchText) {
-                console.log('Find next:', searchText);
+                console.log("Find next:", searchText);
               }
             }}
           >
@@ -60,7 +60,7 @@ export default function TextEditor({ filePath, initialContent = "" }: TextEditor
 
   const handleOpenSearch = () => {
     openChildWindow({
-      title: 'Find',
+      title: "Find",
       component: SearchPanel,
       width: 350,
       height: 120,
@@ -88,19 +88,17 @@ export default function TextEditor({ filePath, initialContent = "" }: TextEditor
   useEffect(() => {
     setMenuBar([
       {
-        type: 'submenu',
-        label: 'File',
+        type: "submenu",
+        label: "File",
         items: [
-          { type: 'item', label: 'New', action: () => setContent("") },
-          { type: 'item', label: 'Save', action: handleSave },
+          { type: "item", label: "New", action: () => setContent("") },
+          { type: "item", label: "Save", action: handleSave },
         ],
       },
       {
-        type: 'submenu',
-        label: 'Edit',
-        items: [
-          { type: 'item', label: 'Find...', action: handleOpenSearch },
-        ],
+        type: "submenu",
+        label: "Edit",
+        items: [{ type: "item", label: "Find...", action: handleOpenSearch }],
       },
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,7 +108,7 @@ export default function TextEditor({ filePath, initialContent = "" }: TextEditor
     <div className="p-4 h-full bg-slate-50">
       <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
         <span className="text-slate-500">📄</span>
-        {filePath ? filePath : 'Untitled'} - Text Editor
+        {filePath ? filePath : "Untitled"} - Text Editor
       </h2>
       <textarea
         className="w-full h-full p-3 border border-slate-300 rounded shadow-inner resize-none font-mono text-sm focus:outline-blue-400"
@@ -120,5 +118,5 @@ export default function TextEditor({ filePath, initialContent = "" }: TextEditor
         style={{ height: "calc(100% - 40px)" }}
       />
     </div>
-  )
+  );
 }
