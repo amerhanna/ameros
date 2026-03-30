@@ -9,7 +9,7 @@ import ContextMenu from "@/components/WindowManager/ContextMenu";
 import { toast } from "sonner";
 
 // Internal Components
-import { FolderView } from "./components/FolderView";
+import { FolderView } from "@/components/FolderView";
 import { NameInputDialog } from "./components/NameInputDialog";
 import { FileProperties } from "./components/FileProperties";
 import { Toolbar } from "./components/Toolbar";
@@ -23,6 +23,7 @@ export default function FileExplorer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<{ path: string; operation: "copy" | "move" } | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: VFSNode | null } | null>(null);
 
   const initVFS = useCallback(async () => {
@@ -56,6 +57,7 @@ export default function FileExplorer() {
 
     if (node.type === "dir") {
       setCurrentPath(node.path);
+      setSelectedPath(null);
     } else {
       if (node.name.toLowerCase().endsWith(".txt")) {
         try {
@@ -91,15 +93,18 @@ export default function FileExplorer() {
     // If it's a drive root like "C:", go to "/"
     if (currentPath.match(/^[A-Z]:$/)) {
       setCurrentPath("/");
+      setSelectedPath(null);
       return;
     }
 
     const lastSlash = currentPath.lastIndexOf("/");
     if (lastSlash === -1) {
       setCurrentPath("/");
+      setSelectedPath(null);
     } else {
       const newPath = currentPath.substring(0, lastSlash);
       setCurrentPath(newPath || (currentPath.includes(":") ? currentPath.split(":")[0] + ":" : "/"));
+      setSelectedPath(null);
     }
   };
 
@@ -260,6 +265,10 @@ export default function FileExplorer() {
     setContextMenu({ x: e.clientX, y: e.clientY, item });
   };
 
+  const handleSelect = (node: VFSNode) => {
+    setSelectedPath(node.path);
+  };
+
   const closeContextMenu = () => setContextMenu(null);
 
   // --- Render logic ---
@@ -306,7 +315,9 @@ export default function FileExplorer() {
           loading={loading}
           error={error}
           clipboard={clipboard}
+          selectedPath={selectedPath}
           onOpen={handleOpen}
+          onSelect={handleSelect}
           onContextMenu={handleContextMenu}
           onRetry={initVFS}
         />

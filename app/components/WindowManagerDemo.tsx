@@ -8,6 +8,7 @@ import FileExplorer from '@/Applications/FileExplorer/FileExplorer';
 import Settings from '@/components/WindowManager/Settings';
 import TestCloseApp from '@/Applications/TestCloseApp/TestCloseApp';
 import DeepSeekHistory from '@/Applications/DeepSeekHistory/DeepSeekHistory';
+import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -70,6 +71,14 @@ const applicationRegistry: ApplicationRegistry = {
     resizable: true,
     maximizable: true,
   },
+  CommonDialogDemo: {
+    component: CommonDialogDemo,
+    icon: '📦',
+    width: 320,
+    height: 400,
+    resizable: false,
+    maximizable: false,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -77,6 +86,7 @@ const startMenuItems: StartMenuItem[] = [
   { label: 'Calculator', component: 'Calculator' },
   { label: 'File Explorer', component: 'FileExplorer' },
   { label: 'Demo Application', component: 'DemoApp' },
+  { label: 'Common Dialog Demo', component: 'CommonDialogDemo' },
   { label: 'History Explorer', component: 'DeepSeekHistory' },
   { label: 'Test Close', component: 'TestCloseApp' },
   { type: 'separator' },
