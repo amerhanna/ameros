@@ -122,14 +122,21 @@ class VFS {
   async ls(path: string): Promise<VFSNode[]> {
     const normalizedPath = this.normalize(path)
 
-    if (normalizedPath === "" || normalizedPath === "/" || normalizedPath === "This PC") {
-      const drives: VFSNode[] = [{ path: "C:", name: this.mounts["C"]?.label || "Local Disk (C:)", type: "dir", lastModified: 0 }]
+    if (normalizedPath === "" || normalizedPath === "/") {
+      const cLabel = this.mounts["C"]?.label || "Internal Storage";
+      const drives: VFSNode[] = [{ path: "C:", name: `${cLabel} (C:)`, type: "dir", lastModified: 0 }];
       Object.keys(this.mounts).forEach((letter) => {
         if (letter !== "C") {
-          drives.push({ path: `${letter}:`, name: this.mounts[letter].label || `Mounted Folder (${letter}:)`, type: "dir", lastModified: 0 })
+          const mLabel = this.mounts[letter].label || "Mounted Folder";
+          drives.push({
+            path: `${letter}:`,
+            name: `${mLabel} (${letter}:)`,
+            type: "dir",
+            lastModified: 0,
+          });
         }
-      })
-      return drives
+      });
+      return drives;
     }
 
     const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/)
@@ -408,6 +415,14 @@ class VFS {
 
   async rename(path: string, newName: string) {
     const normalizedPath = this.normalize(path)
+    
+    // Drive Renaming (Volume Label)
+    const driveMatch = normalizedPath.match(/^([A-Z]):$/)
+    if (driveMatch) {
+      await this.setVolumeLabel(driveMatch[1], newName)
+      return
+    }
+
     const node = await this.getNode(normalizedPath)
     if (!node) throw new Error("Source not found")
 
@@ -607,10 +622,10 @@ class VFS {
   }
 
   private normalize(path: string): string {
-    let p = path.replace(/\\/g, "/")
-    if (p.endsWith("/") && p.length > 3) p = p.slice(0, -1)
-    if (p === "/" || p === "") return "This PC" // Root alias
-    return p
+    let p = path.replace(/\\/g, "/");
+    if (p.endsWith("/") && p.length > 3) p = p.slice(0, -1);
+    if (p === "/" || p === "") return "/"; // Root alias
+    return p;
   }
 }
 
