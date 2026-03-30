@@ -1,6 +1,6 @@
 "use client"
 
-import { HardDrive, Folder, File as FileIcon, FileText, Monitor, Info } from "lucide-react"
+import { HardDrive, Folder, File as FileIcon, FileText, Monitor, Info, Lock } from "lucide-react"
 import { type VFSNode } from "@/lib/vfs"
 import { Button } from "@/components/ui/button"
 
@@ -71,7 +71,7 @@ export function FolderView({
                 onContextMenu(e, item)
               }}
             >
-              <div className="w-10 h-10 flex items-center justify-center">
+              <div className="relative w-10 h-10 flex items-center justify-center">
                 {isDrive ? (
                   <HardDrive className="w-10 h-10 text-blue-600" />
                 ) : item.type === "dir" ? (
@@ -80,6 +80,11 @@ export function FolderView({
                   <FileText className="w-10 h-10 text-blue-400" />
                 ) : (
                   <FileIcon className="w-10 h-10 text-slate-400" />
+                )}
+                {item.status === 'prompt' && (
+                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-slate-100 animate-in zoom-in duration-300">
+                    <Lock className="w-3 h-3 text-amber-500 fill-amber-500" />
+                  </div>
                 )}
               </div>
               <span className="text-[11px] leading-tight break-all line-clamp-2 px-1 text-slate-700">

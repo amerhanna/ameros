@@ -13,6 +13,7 @@ export interface VFSNode {
   content?: string | ArrayBuffer | Blob | File
   lastModified: number
   handle?: FileSystemHandle // For mounted external files/dirs
+  status?: 'granted' | 'denied' | 'prompt'
 }
 
 export interface VFSMount {
@@ -125,17 +126,19 @@ class VFS {
     if (normalizedPath === "" || normalizedPath === "/") {
       const cLabel = this.mounts["C"]?.label || "Internal Storage";
       const drives: VFSNode[] = [{ path: "C:", name: `${cLabel} (C:)`, type: "dir", lastModified: 0 }];
-      Object.keys(this.mounts).forEach((letter) => {
+      for (const letter of Object.keys(this.mounts)) {
         if (letter !== "C") {
           const mLabel = this.mounts[letter].label || "Mounted Folder";
+          const status = await this.checkPermission(letter);
           drives.push({
             path: `${letter}:`,
             name: `${mLabel} (${letter}:)`,
             type: "dir",
             lastModified: 0,
+            status: status
           });
         }
-      });
+      }
       return drives;
     }
 
@@ -619,6 +622,33 @@ class VFS {
 
   getMounts() {
     return Object.keys(this.mounts).map(letter => this.mounts[letter]);
+  }
+
+  async checkPermission(letter: string): Promise<'granted' | 'denied' | 'prompt'> {
+    if (letter === "C") return 'granted';
+    const mount = this.mounts[letter];
+    if (!mount) return 'denied';
+
+    try {
+      return await (mount.handle as any).queryPermission({ mode: 'readwrite' });
+    } catch (err) {
+      console.error(`VFS: Failed to query permission for ${letter}:`, err);
+      return 'prompt';
+    }
+  }
+
+  async requestPermission(letter: string): Promise<boolean> {
+    if (letter === "C") return true;
+    const mount = this.mounts[letter];
+    if (!mount) return false;
+
+    try {
+      const status = await (mount.handle as any).requestPermission({ mode: 'readwrite' });
+      return status === 'granted';
+    } catch (err) {
+      console.error(`VFS: Failed to request permission for ${letter}:`, err);
+      return false;
+    }
   }
 
   private normalize(path: string): string {

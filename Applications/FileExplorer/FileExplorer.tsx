@@ -45,6 +45,15 @@ export default function FileExplorer() {
   }, [initVFS]);
 
   const handleOpen = async (node: VFSNode) => {
+    if (node.status === "prompt") {
+      const letter = node.path.split(":")[0];
+      const granted = await vfs.requestPermission(letter);
+      if (granted) {
+        initVFS();
+      }
+      return;
+    }
+
     if (node.type === "dir") {
       setCurrentPath(node.path);
     } else {
@@ -96,8 +105,11 @@ export default function FileExplorer() {
 
   const handleMount = async () => {
     try {
-      const handle = await (window as any).showDirectoryPicker();
-      await vfs.mountFolder(handle);
+      const handle = await (window as any).showDirectoryPicker({
+        mode: "readwrite",
+      });
+      const letter = await vfs.mountFolder(handle);
+      await vfs.requestPermission(letter);
       initVFS();
       toast.success("Folder mounted successfully");
     } catch (err) {
