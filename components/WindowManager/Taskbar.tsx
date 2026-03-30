@@ -51,6 +51,7 @@ export default function Taskbar({
               onContextMenu(window.id, e.clientX, e.clientY);
             }}
           >
+            {window.icon && <span>{window.icon}</span>}
             {window.title}
           </Button>
         ))}
