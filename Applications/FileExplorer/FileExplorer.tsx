@@ -14,6 +14,7 @@ import { NameInputDialog } from "./components/NameInputDialog";
 import { FileProperties } from "./components/FileProperties";
 import { Toolbar } from "./components/Toolbar";
 import { StatusBar } from "./components/StatusBar";
+import { useClipboard } from "@/lib/clipboard";
 
 export default function FileExplorer() {
   const { launchApp } = useSystemActions();
@@ -22,7 +23,7 @@ export default function FileExplorer() {
   const [items, setItems] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [clipboard, setClipboard] = useState<{ path: string; operation: "copy" | "move" } | null>(null);
+  const { cut, copy, clear, clipboard } = useClipboard();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: VFSNode | null } | null>(null);
 
@@ -219,26 +220,30 @@ export default function FileExplorer() {
   };
 
   const handleCut = (path: string) => {
-    setClipboard({ path, operation: "move" });
-    toast.info("Item cut to clipboard");
+    cut(path, {
+      onSuccess: () => toast.info("Item cut to clipboard"),
+      onError: () => toast.error("Failed to cut item")
+    });
   };
 
   const handleCopy = (path: string) => {
-    setClipboard({ path, operation: "copy" });
-    toast.info("Item copied to clipboard");
+    copy(path, {
+      onSuccess: () => toast.info("Item copied to clipboard"),
+      onError: () => toast.error("Failed to copy item")
+    });
   };
 
   const handlePaste = async () => {
-    if (!clipboard || currentPath === "/") return;
-    const name = clipboard.path.split("/").pop() || "unknown";
+    if (!clipboard || clipboard.itemType !== "file" || currentPath === "/") return;
+    const name = clipboard.item.split("/").pop() || "unknown";
     const dest = `${currentPath}/${name}`;
 
     try {
-      if (clipboard.operation === "copy") {
-        await vfs.copy(clipboard.path, dest);
+      if (clipboard.action === "copy") {
+        await vfs.copy(clipboard.item, dest);
       } else {
-        await vfs.move(clipboard.path, dest);
-        setClipboard(null); // Clear cut clipboard
+        await vfs.move(clipboard.item, dest);
+        clear(); // Clear cut clipboard
       }
       initVFS();
       toast.success(`Pasted into ${currentPath}`);

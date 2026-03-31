@@ -4,12 +4,13 @@ import { HardDrive, Folder, File as FileIcon, FileText, Monitor, Info, Lock } fr
 import { type VFSNode } from "@/lib/vfs";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { type ClipboardState } from "@/lib/clipboard";
 
 interface FolderViewProps {
   items: VFSNode[];
   loading?: boolean;
   error?: string | null;
-  clipboard?: { path: string; operation: "copy" | "move" } | null;
+  clipboard?: ClipboardState | null;
   viewStyle?: "grid" | "list";
   selectedPath?: string | null;
   onOpen: (item: VFSNode) => void;
@@ -63,7 +64,7 @@ export function FolderView({
     <div className="h-full overflow-auto bg-white" onContextMenu={(e) => onContextMenu(e, null)}>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] p-2 content-start">
         {items.map((item) => {
-          const isCut = clipboard?.path === item.path && clipboard.operation === "move";
+          const isCut = clipboard?.item === item.path && clipboard.action === "cut";
           const isDrive = item.path === "C:" || item.path.endsWith(":");
           const isSelected = selectedItem?.path === item.path;
 

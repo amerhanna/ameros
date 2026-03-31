@@ -1,10 +1,11 @@
 "use client"
 
 import { Info } from "lucide-react"
+import { type ClipboardState } from "@/lib/clipboard"
 
 interface StatusBarProps {
   itemCount: number;
-  clipboard: { path: string; operation: string } | null;
+  clipboard: ClipboardState | null;
 }
 
 export function StatusBar({ itemCount, clipboard }: StatusBarProps) {
@@ -14,7 +15,7 @@ export function StatusBar({ itemCount, clipboard }: StatusBarProps) {
         <span>{itemCount} items</span>
         {clipboard && (
           <span className="text-blue-600 font-medium tracking-tight">
-            Clipboard: Item {clipboard.operation === "move" ? "extracted" : "copied"}
+            Clipboard: Item {clipboard.action === "cut" ? "extracted" : "copied"}
           </span>
         )}
       </div>

@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { ClipboardProvider } from "@/lib/clipboard";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,8 +25,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        {children}
-        <Analytics />
+        <ClipboardProvider>
+          {children}
+          <Analytics />
+        </ClipboardProvider>
       </body>
     </html>
   )
