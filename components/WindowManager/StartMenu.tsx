@@ -18,6 +18,10 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[data-start-button="true"]')) {
+        return
+      }
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose()
       }
@@ -48,8 +52,13 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
   return (
     <div
       ref={menuRef}
-      className="absolute bottom-8 left-1 w-56 bg-gray-300 border-2 border-white shadow-lg z-50 select-none pb-1"
-      style={{ borderTopColor: "#c0c0c0", borderLeftColor: "#c0c0c0" }}
+      className="absolute bottom-8 left-1 w-56 bg-gray-300 border-2 border-white shadow-lg select-none pb-1"
+      style={{
+        borderTopColor: "#c0c0c0",
+        borderLeftColor: "#c0c0c0",
+        // Keep Start Menu above any window z-index growth.
+        zIndex: 2147483647,
+      }}
     >
       {/* Start Menu Header */}
       <div className="bg-gradient-to-r from-blue-800 to-blue-600 text-white p-3 flex items-center gap-3">

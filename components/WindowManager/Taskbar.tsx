@@ -25,6 +25,7 @@ export default function Taskbar({
       {/* Start Button */}
       <Button
         variant="ghost"
+        data-start-button="true"
         className={`h-6 px-3 text-sm border border-black rounded-none font-bold ${
           isStartMenuOpen ? "bg-gray-400 border-gray-500 shadow-inner" : "bg-gray-300 hover:bg-gray-200"
         }`}
