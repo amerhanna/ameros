@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { WindowState } from '@/types/window';
 import MyButton from '../MyButton';
 
@@ -20,6 +21,18 @@ export default function Taskbar({
   isStartMenuOpen,
   onContextMenu,
 }: TaskbarProps) {
+  const [time, setTime] = useState('--:--');
+
+  useEffect(() => {
+    const updateTime = () => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    };
+
+    updateTime();
+    const intervalId = window.setInterval(updateTime, 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   return (
     <div className="absolute bottom-0 left-0 right-0 h-8 bg-[#c0c0c0] border-t-2 border-white flex items-center p-1 gap-1">
       {/* Start Button */}
@@ -55,7 +68,7 @@ export default function Taskbar({
 
       {/* System Tray Area */}
       <div className="flex items-center gap-2 px-2 border border-r-white border-b-white border-l-[#808080] border-t-[#808080] bg-[#c0c0c0] h-6 ml-1 shadow-inner">
-        <div className="text-[11px] font-['Tahoma']">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        <div className="text-[11px] font-['Tahoma']">{time}</div>
       </div>
     </div>
   );
