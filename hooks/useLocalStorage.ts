@@ -35,19 +35,20 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 		}
 	};
 
-	useEffect(() => {
-		const handleStorageChange = (event: StorageEvent | Event) => {
-			if (isInternalUpdate.current) return;
-			if (event instanceof StorageEvent) {
-				if (event.key && event.key !== key) return;
-			} else {
-				const customEvent = event as CustomEvent<{ key?: string }>;
-				const changedKey = customEvent.detail?.key;
-				if (changedKey && changedKey !== key) return;
-			}
-			setStoredValue(readValue());
-		};
+const handleStorageChange = useCallback((event: StorageEvent | Event) => {
+		if (isInternalUpdate.current) return;
+		if (event instanceof StorageEvent) {
+			if (event.key && event.key !== key) return;
+		} else {
+			const customEvent = event as CustomEvent<{ key?: string }>;
+			const changedKey = customEvent.detail?.key;
+			if (changedKey && changedKey !== key) return;
+		}
+		// Defer the update to avoid setState during render
+		setTimeout(() => setStoredValue(readValue()), 0);
+	}, [key, readValue]);
 
+	useEffect(() => {
 		window.addEventListener('storage', handleStorageChange);
 		window.addEventListener('local-storage', handleStorageChange);
 
@@ -55,7 +56,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 			window.removeEventListener('storage', handleStorageChange);
 			window.removeEventListener('local-storage', handleStorageChange);
 		};
-	}, [key, readValue]);
+	}, [handleStorageChange]);
 
 	return [storedValue, setValue] as const;
 }

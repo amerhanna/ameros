@@ -9,6 +9,8 @@ import Settings from '@/components/WindowManager/Settings';
 import TestCloseApp from '@/Applications/TestCloseApp/TestCloseApp';
 import DeepSeekHistory from '@/Applications/DeepSeekHistory/DeepSeekHistory';
 import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
+import InstallerApp from '@/Applications/Installer/InstallerApp';
+import WebApp from '@/Applications/WebApp/WebApp';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -79,6 +81,22 @@ const applicationRegistry: ApplicationRegistry = {
     resizable: false,
     maximizable: false,
   },
+  WebApp: {
+    component: WebApp,
+    icon: '🌐',
+    width: 1000,
+    height: 700,
+    resizable: true,
+    maximizable: true,
+  },
+  Installer: {
+    component: InstallerApp,
+    icon: '🛠️',
+    width: 900,
+    height: 700,
+    resizable: true,
+    maximizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -88,6 +106,7 @@ const startMenuItems: StartMenuItem[] = [
   { label: 'Demo Application', component: 'DemoApp' },
   { label: 'Common Dialog Demo', component: 'CommonDialogDemo' },
   { label: 'History Explorer', component: 'DeepSeekHistory' },
+  { label: 'App Installer', component: 'Installer' },
   { label: 'Test Close', component: 'TestCloseApp' },
   { type: 'separator' },
   { label: 'Settings', component: 'Settings' },

@@ -33,6 +33,7 @@ export default function WindowManager({
   startMenuItems = [] 
 }: WindowManagerProps) {
   const [persistentWindows, setPersistentWindows] = useLocalStorage<PersistentWindowState[]>('ameros-windows', []);
+  const [installedApps] = useLocalStorage<StartMenuItem[]>('ameros-installed-apps', []);
   const [activeWindowId, setActiveWindowId] = useLocalStorage<string | null>('ameros-active-window', null);
   const [nextZIndex, setNextZIndex] = useLocalStorage<number>('ameros-next-zindex', 1);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
@@ -99,6 +100,8 @@ export default function WindowManager({
       } as WindowState;
     });
   }, [managerSnap, applicationRegistry, mounted]);
+
+  const combinedStartMenuItems = useMemo(() => [...installedApps, ...startMenuItems], [startMenuItems, installedApps]);
 
   const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
@@ -478,7 +481,7 @@ export default function WindowManager({
         isOpen={isStartMenuOpen}
         onClose={closeStartMenu}
         onOpenWindow={openWindow}
-        items={startMenuItems}
+        items={combinedStartMenuItems}
         applicationRegistry={applicationRegistry}
       />
 

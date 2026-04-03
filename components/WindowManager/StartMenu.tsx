@@ -4,6 +4,7 @@ import type React from "react"
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef } from "react"
 import type { StartMenuItem, WindowConfig, ApplicationRegistry } from "@/types/window"
+import Image from "next/image"
 
 interface StartMenuProps {
   isOpen: boolean
@@ -73,7 +74,10 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
             return <div key={index} className="h-px bg-gray-400 mx-2 my-1" />
           }
 
-          const icon = item.type === "action" ? item.icon : applicationRegistry[item.component]?.icon
+          const icon = item.type === "action"
+            ? item.icon
+            : applicationRegistry[item.component]?.icon || item.launchArgs?.iconUrl || '🌐';
+          const isIconUrl = typeof icon === 'string' && icon.startsWith('http');
           const label = item.label
 
           return (
@@ -83,7 +87,13 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
               className="w-full justify-start px-3 py-1.5 h-auto text-left hover:bg-blue-600 hover:text-white rounded-none border-0"
               onClick={() => handleItemClick(item)}
             >
-              <span className="mr-3 text-lg flex items-center justify-center w-6 h-6">{icon}</span>
+              <span className="mr-3 text-lg flex items-center justify-center w-6 h-6">
+                {isIconUrl ? (
+                  <Image src={icon} width={16} height={16} alt="icon" className="rounded" />
+                ) : (
+                  icon
+                )}
+              </span>
               <span className="text-sm font-medium">{label}</span>
             </Button>
           )
