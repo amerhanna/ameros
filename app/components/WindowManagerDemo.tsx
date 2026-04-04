@@ -11,6 +11,7 @@ import DeepSeekHistory from '@/Applications/DeepSeekHistory/DeepSeekHistory';
 import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
 import InstallerApp from '@/Applications/Installer/InstallerApp';
 import WebApp from '@/Applications/WebApp/WebApp';
+import Regedit from '@/Applications/Regedit/Regedit';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -97,6 +98,14 @@ const applicationRegistry: ApplicationRegistry = {
     resizable: true,
     maximizable: true,
   },
+  Regedit: {
+    component: Regedit,
+    icon: '🔧',
+    width: 800,
+    height: 600,
+    resizable: true,
+    maximizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -110,6 +119,7 @@ const startMenuItems: StartMenuItem[] = [
   { label: 'Test Close', component: 'TestCloseApp' },
   { type: 'separator' },
   { label: 'Settings', component: 'Settings' },
+  { label: 'Registry Editor', component: 'Regedit' },
   { type: 'separator' },
   {
     icon: '🔌',
