@@ -6,15 +6,29 @@
  * Supports recursive operations, cross-drive transfers (C: <=> D:), and volume labels.
  */
 
-export interface VFSNode {
-  path: string
-  name: string
-  type: "file" | "dir"
-  content?: string | ArrayBuffer | Blob | File
-  lastModified: number
-  handle?: FileSystemHandle // For mounted external files/dirs
-  status?: 'granted' | 'denied' | 'prompt'
+export interface BaseVFSNode {
+  path: string;
+  name: string;
+  type: "drive" | "dir" | "file";
+  lastModified: number;
+  handle?: FileSystemHandle; // For mounted external files/dirs
+  status?: "granted" | "denied" | "prompt";
 }
+
+export interface DriveNode extends BaseVFSNode {
+  type: "drive";
+}
+
+export interface FolderNode extends BaseVFSNode {
+  type: "dir";
+}
+
+export interface FileNode extends BaseVFSNode {
+  type: "file";
+  content?: string | ArrayBuffer | Blob | File;
+}
+
+export type VFSNode = DriveNode | FolderNode | FileNode;
 
 export interface VFSMount {
   letter: string
@@ -25,7 +39,7 @@ export interface VFSMount {
 export interface VFSProperties {
   size: number
   lastModified: number
-  type: "file" | "dir"
+  type: "drive" | "file" | "dir"
   readOnly: boolean
   path: string
 }
@@ -99,7 +113,7 @@ class VFS {
 
   private async getNode(path: string): Promise<VFSNode | null> {
     const normalizedPath = this.normalize(path)
-    if (normalizedPath === "C:") return { path: "C:", name: "C:", type: "dir", lastModified: 0 }
+    if (normalizedPath === "C:") return { path: "C:", name: "C:", type: "drive", lastModified: 0 }
 
     const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/)
     if (driveMatch) {
@@ -125,7 +139,7 @@ class VFS {
 
     if (normalizedPath === "" || normalizedPath === "/") {
       const cLabel = this.mounts["C"]?.label || "Internal Storage";
-      const drives: VFSNode[] = [{ path: "C:", name: `${cLabel} (C:)`, type: "dir", lastModified: 0 }];
+      const drives: VFSNode[] = [{ path: "C:", name: `${cLabel} (C:)`, type: "drive", lastModified: 0 }];
       for (const letter of Object.keys(this.mounts)) {
         if (letter !== "C") {
           const mLabel = this.mounts[letter].label || "Mounted Folder";
@@ -133,7 +147,7 @@ class VFS {
           drives.push({
             path: `${letter}:`,
             name: `${mLabel} (${letter}:)`,
-            type: "dir",
+            type: "drive",
             lastModified: 0,
             status: status
           });
@@ -266,7 +280,11 @@ class VFS {
       return file
     }
 
-    return node.content || ""
+    if (node.type === "file") {
+      return (node as FileNode).content || ""
+    }
+
+    throw new Error("Not a file")
   }
 
   async writeFile(path: string, content: string | ArrayBuffer | Blob | File) {
