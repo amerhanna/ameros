@@ -17,24 +17,48 @@ export interface RegistryEntry {
 
 class Registry {
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
+  private readonly SYSTEM_DIR = "C:/Windows/System32/config";
   private readonly HIVE_PATH = "C:/Windows/System32/config/SYSTEM.reg";
 
   async init() {
     if (this.isInitialized) return;
-    
-    // Ensure VFS is ready first so we can access C:
-    await vfs.init();
-    
-    // Create system directory if it doesn't exist
-    if (!(await vfs.exists("C:/Windows/System32/config"))) {
-      await vfs.mkdir("C:/Windows/System32/config");
-    }
+    if (this.initPromise) return this.initPromise;
 
-    this.isInitialized = true;
-    console.log("Registry: Initialized on Internal Storage.");
+    this.initPromise = (async () => {
+      await vfs.init();
+
+      try {
+        const exists = await vfs.exists(this.SYSTEM_DIR);
+        if (!exists) {
+          await vfs.mkdir(this.SYSTEM_DIR);
+        }
+
+        const verified = await vfs.exists(this.SYSTEM_DIR);
+        if (!verified) {
+          throw new Error(`Registry system directory could not be verified or created: ${this.SYSTEM_DIR}`);
+        }
+
+        this.isInitialized = true;
+        console.log("Registry: Initialized on Internal Storage.");
+      } catch (error) {
+        this.initPromise = null;
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Registry init failed: ${message}`);
+      }
+    })();
+
+    return this.initPromise;
+  }
+
+  private async ensureInitialized() {
+    if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
+    return this.init();
   }
 
   async get<T>(path: string, defaultValue: T): Promise<T> {
+    await this.ensureInitialized();
     try {
       const hive = await this.loadHive();
       return hive[path] !== undefined ? (hive[path] as T) : defaultValue;
@@ -44,6 +68,7 @@ class Registry {
   }
 
   async set(path: string, value: RegistryValue): Promise<void> {
+    await this.ensureInitialized();
     const hive = await this.loadHive();
     hive[path] = value;
     await this.saveHive(hive);
@@ -52,6 +77,7 @@ class Registry {
   }
 
   async getAll(): Promise<Record<string, RegistryValue>> {
+    await this.ensureInitialized();
     return await this.loadHive();
   }
 
