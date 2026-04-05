@@ -17,10 +17,12 @@ export interface BaseVFSNode {
 
 export interface DriveNode extends BaseVFSNode {
   type: "drive";
+  children?: FolderTreeNode[];
 }
 
 export interface FolderNode extends BaseVFSNode {
   type: "dir";
+  children?: FolderTreeNode[];
 }
 
 export interface FileNode extends BaseVFSNode {
@@ -29,6 +31,8 @@ export interface FileNode extends BaseVFSNode {
 }
 
 export type VFSNode = DriveNode | FolderNode | FileNode;
+
+export type FolderTreeNode = DriveNode | FolderNode;
 
 export interface VFSMount {
   letter: string
@@ -666,6 +670,60 @@ class VFS {
     } catch (err) {
       console.error(`VFS: Failed to request permission for ${letter}:`, err);
       return false;
+    }
+  }
+
+  async getTree(): Promise<FolderTreeNode[]> {
+    const rootItems = await this.ls("/");
+    const drives = rootItems.filter(item => item.type === "drive") as DriveNode[];
+
+    const tree: FolderTreeNode[] = [];
+
+    for (const drive of drives) {
+      const permission = await this.checkPermission(drive.path[0]);
+      let children: FolderTreeNode[] | undefined;
+
+      if (permission === "granted") {
+        try {
+          children = await this.getSubTree(drive.path);
+        } catch (err) {
+          console.warn(`Failed to get subtree for ${drive.path}:`, err);
+          children = [];
+        }
+      } else {
+        // For denied or prompt, don't populate children
+        children = [];
+        drive.status = permission;
+      }
+
+      const driveNode: FolderTreeNode = {
+        ...drive,
+        children
+      };
+      tree.push(driveNode);
+    }
+
+    return tree;
+  }
+
+  private async getSubTree(path: string): Promise<FolderTreeNode[]> {
+    try {
+      const items = await this.ls(path);
+      const folders = items.filter(item => item.type === "dir") as FolderNode[];
+
+      const children: FolderTreeNode[] = [];
+      for (const folder of folders) {
+        const child: FolderTreeNode = {
+          ...folder,
+          children: await this.getSubTree(folder.path)
+        };
+        children.push(child);
+      }
+
+      return children;
+    } catch (err) {
+      console.warn(`Failed to get subtree for ${path}:`, err);
+      return [];
     }
   }
 

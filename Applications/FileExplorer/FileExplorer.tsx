@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSystemActions } from "@/hooks/useSystemActions";
 import { useWindowActions } from "@/hooks/useWindowActions";
-import { vfs, type VFSNode } from "@/lib/vfs";
+import { vfs, type VFSNode, type FolderTreeNode } from "@/lib/vfs";
 import { type MenuItemType } from "@/components/WindowManager/Menu";
 import ContextMenu from "@/components/WindowManager/ContextMenu";
 import { toast } from "sonner";
 
 // Internal Components
 import { FolderView } from "@/components/FolderView";
+import { FolderTreeView } from "@/components/FolderTreeView";
 import { NameInputDialog } from "./components/NameInputDialog";
 import { FileProperties } from "./components/FileProperties";
 import { Toolbar } from "./components/Toolbar";
@@ -25,6 +26,7 @@ export default function FileExplorer() {
   const [error, setError] = useState<string | null>(null);
   const { cut, copy, clear, clipboard } = useClipboard();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [treeData, setTreeData] = useState<FolderTreeNode[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: VFSNode | null } | null>(null);
 
   const initVFS = useCallback(async () => {
@@ -34,6 +36,8 @@ export default function FileExplorer() {
       await vfs.init();
       const content = await vfs.ls(currentPath);
       setItems(content);
+      const tree = await vfs.getTree();
+      setTreeData(tree);
     } catch (err) {
       setError((err as Error).message);
       toast.error("VFS Error: " + (err as Error).message);
@@ -124,6 +128,19 @@ export default function FileExplorer() {
         toast.error("Failed to mount folder");
       }
     }
+  };
+
+  const treeItems = treeData;
+
+  const handleTreeOpen = (item: VFSNode) => {
+    if (item.type === "drive" || item.type === "dir") {
+      setCurrentPath(item.path);
+      setSelectedPath(null);
+    }
+  };
+
+  const handleTreeSelect = (item: VFSNode) => {
+    // Optional: highlight in tree
   };
 
   // --- Context Menu Actions ---
@@ -315,17 +332,34 @@ export default function FileExplorer() {
       <Toolbar currentPath={currentPath} canGoBack={currentPath !== "/"} onBack={handleBack} onMount={handleMount} />
 
       <div className="flex-1 overflow-hidden bg-white m-1 border border-[#808080] shadow-inner relative">
-        <FolderView
-          items={items}
-          loading={loading}
-          error={error}
-          clipboard={clipboard}
-          selectedPath={selectedPath}
-          onOpen={handleOpen}
-          onSelect={handleSelect}
-          onContextMenu={handleContextMenu}
-          onRetry={initVFS}
-        />
+        <div className="h-full flex min-h-0 overflow-hidden">
+          <div className="w-64 min-h-0 border-r border-slate-200">
+            <FolderTreeView
+              currentPath={currentPath}
+              items={treeItems}
+              loading={loading}
+              error={error}
+              selectedPath={currentPath}
+              onOpen={handleTreeOpen}
+              onSelect={handleTreeSelect}
+              onContextMenu={() => {}}
+              onRetry={initVFS}
+            />
+          </div>
+          <div className="flex-1 min-h-0">
+            <FolderView
+              items={items}
+              loading={loading}
+              error={error}
+              clipboard={clipboard}
+              selectedPath={selectedPath}
+              onOpen={handleOpen}
+              onSelect={handleSelect}
+              onContextMenu={handleContextMenu}
+              onRetry={initVFS}
+            />
+          </div>
+        </div>
 
         {contextMenu && (
           <ContextMenu
