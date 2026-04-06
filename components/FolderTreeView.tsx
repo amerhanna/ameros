@@ -19,6 +19,34 @@ interface FolderTreeViewProps {
   onRetry?: () => void;
 }
 
+// Hoist these pure functions outside the component.
+// This gives them stable references, preventing the underlying TreeView
+// from unnecessarily remounting nodes and wiping out local expansion state.
+const getIcon = (item: FolderTreeNode): ReactNode => {
+  if (item.type === "drive") {
+    return <HardDrive className="w-5 h-5 text-blue-600" />;
+  }
+  if (item.type === "dir") {
+    return <Folder className="w-5 h-5 text-amber-400 fill-amber-400/20" />;
+  }
+  return <Monitor className="w-5 h-5 text-slate-600" />;
+};
+
+const getStatusIcon = (item: FolderTreeNode): ReactNode | null =>
+  item.status === "prompt" ? <Lock className="w-3 h-3 text-amber-500 fill-amber-500" /> : null;
+
+const getChildren = (item: FolderTreeNode): FolderTreeNode[] | undefined => {
+  return item.children;
+};
+
+const getKey = (item: FolderTreeNode): string => {
+  return item.path;
+};
+
+const getLabel = (item: FolderTreeNode): string => {
+  return item.name;
+};
+
 export function FolderTreeView({
   currentPath,
   items,
@@ -30,24 +58,6 @@ export function FolderTreeView({
   onContextMenu,
   onRetry,
 }: FolderTreeViewProps) {
-  const getIcon = (item: FolderTreeNode): ReactNode => {
-    if (item.type === "drive") {
-      return <HardDrive className="w-5 h-5 text-blue-600" />;
-    }
-    if (item.type === "dir") {
-      return <Folder className="w-5 h-5 text-amber-400 fill-amber-400/20" />;
-    }
-    return <Monitor className="w-5 h-5 text-slate-600" />;
-  };
-
-  const getStatusIcon = (item: FolderTreeNode): ReactNode | null =>
-    item.status === "prompt" ? <Lock className="w-3 h-3 text-amber-500 fill-amber-500" /> : null;
-
-  const getChildren = (item: FolderTreeNode): FolderTreeNode[] | undefined => {
-    // For now, assume no children; in a real implementation, you'd fetch subfolders
-    return [];
-  };
-
   return (
     <TreeView<FolderTreeNode>
       items={items}
@@ -55,8 +65,8 @@ export function FolderTreeView({
       error={error}
       defaultExpanded={[currentPath]}
       selectedKey={selectedPath}
-      getKey={(item) => item.path}
-      getLabel={(item) => item.name}
+      getKey={getKey}
+      getLabel={getLabel}
       getIcon={getIcon}
       getChildren={getChildren}
       getStatusIcon={getStatusIcon}

@@ -1,16 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { FolderView } from "@/components/FolderView";
-import { vfs, type VFSNode } from "@/lib/vfs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronUp, FolderPlus } from "lucide-react";
+import { useState, useEffect, useCallback } from 'react';
+import { FolderView } from '@/components/FolderView';
+import { FolderTreeView } from '@/components/FolderTreeView';
+import { vfs, type VFSNode, type FolderTreeNode } from '@/lib/vfs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronUp, FolderPlus } from 'lucide-react';
+import ResizablePanels from '@/components/ui/layout/ResizablePanels';
 
 interface SystemDialogFrameProps {
   confirmLabel: string;
   initialPath?: string;
-  selectionMode: "file" | "save" | "folder";
+  selectionMode: 'file' | 'save' | 'folder';
   onConfirm: (path: string) => void;
   onCancel: () => void;
   fileFilter?: (node: VFSNode) => boolean;
@@ -18,7 +20,7 @@ interface SystemDialogFrameProps {
 
 export function SystemDialogFrame({
   confirmLabel,
-  initialPath = "C:",
+  initialPath = 'C:',
   selectionMode,
   onConfirm,
   onCancel,
@@ -28,21 +30,25 @@ export function SystemDialogFrame({
   const [items, setItems] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedName, setSelectedName] = useState("");
+  const [selectedName, setSelectedName] = useState('');
   const [history, setHistory] = useState<string[]>([]);
+
+  // Tree state
+  const [treeData, setTreeData] = useState<FolderTreeNode[]>([]);
+  const [treeLoaded, setTreeLoaded] = useState(false);
 
   const loadFolder = useCallback(
     async (path: string) => {
       setLoading(true);
       setError(null);
       try {
-        if (!(await vfs.exists(path)) && path !== "/") {
-          path = "C:";
+        if (!(await vfs.exists(path)) && path !== '/') {
+          path = 'C:';
         }
         const content = await vfs.ls(path);
         let filtered = content;
-        if ((selectionMode === "file" || selectionMode === "save") && fileFilter) {
-          filtered = content.filter((item) => item.type === "dir" || fileFilter(item));
+        if ((selectionMode === 'file' || selectionMode === 'save') && fileFilter) {
+          filtered = content.filter((item) => item.type === 'dir' || fileFilter(item));
         }
         setItems(filtered);
         setCurrentPath(path);
@@ -52,14 +58,13 @@ export function SystemDialogFrame({
         setLoading(false);
       }
     },
-    [selectionMode, fileFilter],
+    [selectionMode, fileFilter]
   );
 
-  const initVFS = useCallback(async () => {
+  const loadFolderItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      await vfs.init();
       const content = await vfs.ls(currentPath);
       setItems(content);
     } catch (err) {
@@ -70,51 +75,81 @@ export function SystemDialogFrame({
   }, [currentPath]);
 
   useEffect(() => {
-    initVFS();
-  }, [initVFS]);
+    loadFolderItems();
+  }, [loadFolderItems]);
+
+  const loadTreeItems = useCallback(
+    async (forceRefresh: boolean = false) => {
+      try {
+        if (!treeLoaded || forceRefresh) {
+          const tree = await vfs.getTree();
+          setTreeData(tree);
+          setTreeLoaded(true);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    },
+    [treeLoaded]
+  );
 
   useEffect(() => {
-    vfs.init().then(() => loadFolder(initialPath));
+    loadFolder(initialPath);
   }, [initialPath, loadFolder]);
 
+  useEffect(() => {
+    loadTreeItems();
+  }, [loadTreeItems]);
+
   const handleSelect = (node: VFSNode) => {
-    if (node.type === "file" && (selectionMode === "file" || selectionMode === "save")) {
+    if (node.type === 'file' && (selectionMode === 'file' || selectionMode === 'save')) {
       setSelectedName(node.name);
-    } else if (node.type === "dir" && selectionMode === "folder") {
+    } else if (node.type === 'dir' && selectionMode === 'folder') {
       setSelectedName(node.name);
     }
   };
 
   const handleOpen = async (node: VFSNode) => {
-    if (node.status === "prompt") {
-      const letter = node.path.split(":")[0];
+    if (node.status === 'prompt') {
+      const letter = node.path.split(':')[0];
       const granted = await vfs.requestPermission(letter);
       if (granted) {
-        // Immediately enter the folder once permission is granted
-        initVFS();
+        loadFolderItems();
         setHistory((prev) => [...prev, currentPath]);
         loadFolder(node.path);
-        if (selectionMode === "folder") {
+        if (selectionMode === 'folder') {
           setSelectedName(node.name);
         } else {
-          setSelectedName("");
+          setSelectedName('');
         }
       }
       return;
     }
 
-    if (node.type === "dir") {
+    if (node.type === 'dir' || node.type === 'drive') {
       setHistory((prev) => [...prev, currentPath]);
       loadFolder(node.path);
-      if (selectionMode === "folder") {
+      if (selectionMode === 'folder') {
         setSelectedName(node.name);
       } else {
-        setSelectedName("");
+        setSelectedName('');
       }
     } else {
-      if (selectionMode === "file" || selectionMode === "save") {
-        const path = currentPath === "/" ? `/${node.name}` : `${currentPath}/${node.name}`;
+      if (selectionMode === 'file' || selectionMode === 'save') {
+        const path = currentPath === '/' ? `/${node.name}` : `${currentPath}/${node.name}`;
         onConfirm(path);
+      }
+    }
+  };
+
+  const handleTreeOpenOrSelect = (item: VFSNode) => {
+    if (item.type === 'drive' || item.type === 'dir') {
+      setHistory((prev) => [...prev, currentPath]);
+      loadFolder(item.path);
+      if (selectionMode === 'folder') {
+        setSelectedName(item.name);
+      } else {
+        setSelectedName('');
       }
     }
   };
@@ -128,48 +163,47 @@ export function SystemDialogFrame({
   };
 
   const handleUp = () => {
-    if (currentPath === "/" || currentPath === "") return;
+    if (currentPath === '/' || currentPath === '') return;
 
-    // If it's a drive root like "C:", go to "/"
     if (currentPath.match(/^[A-Z]:$/)) {
       setHistory((prev) => [...prev, currentPath]);
-      loadFolder("/");
+      loadFolder('/');
       return;
     }
 
-    const lastSlash = currentPath.lastIndexOf("/");
-    let newPath = "/";
+    const lastSlash = currentPath.lastIndexOf('/');
+    let newPath = '/';
     if (lastSlash === -1) {
-      newPath = "/";
+      newPath = '/';
     } else {
-      newPath = currentPath.substring(0, lastSlash) || (currentPath.includes(":") ? currentPath.split(":")[0] + ":" : "/");
+      newPath = currentPath.substring(0, lastSlash) || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/');
     }
     setHistory((prev) => [...prev, currentPath]);
     loadFolder(newPath);
-    setSelectedName("");
+    setSelectedName('');
   };
 
   const handleConfirm = () => {
-    if (selectionMode === "folder") {
+    if (selectionMode === 'folder') {
       onConfirm(currentPath);
     } else {
       if (selectedName) {
-        // Ensure path formatting
-        const path = currentPath === "/" ? `/${selectedName}` : `${currentPath}/${selectedName}`;
+        const path = currentPath === '/' ? `/${selectedName}` : `${currentPath}/${selectedName}`;
         onConfirm(path);
       }
     }
   };
 
   const handleNewFolder = async () => {
-    if (currentPath === "/") return;
-    const name = prompt("Enter folder name:", "New Folder");
+    if (currentPath === '/') return;
+    const name = prompt('Enter folder name:', 'New Folder');
     if (name) {
       try {
         await vfs.mkdir(`${currentPath}/${name}`);
         loadFolder(currentPath);
+        loadTreeItems(true); // Refresh tree
       } catch (err) {
-        alert("Failed to create folder");
+        alert('Failed to create folder');
       }
     }
   };
@@ -207,26 +241,46 @@ export function SystemDialogFrame({
 
       {/* Main View */}
       <div className="flex-1 min-h-0 bg-white border border-[#808080] overflow-hidden shadow-[inset_1px_1px_1px_rgba(0,0,0,0.2)]">
-        <FolderView
-          items={items}
-          loading={loading}
-          error={error}
-          selectedPath={selectedName ? (currentPath === "/" ? `/${selectedName}` : `${currentPath}/${selectedName}`) : null}
-          onOpen={handleOpen}
-          onSelect={handleSelect}
-          onContextMenu={() => {}}
-          viewStyle="grid"
-        />
+        <ResizablePanels direction="horizontal" initialSizes={[30, 70]} minSize={100} className="h-full">
+          {/* Tree View */}
+          <div className="h-full border-r border-[#808080] bg-white overflow-y-auto">
+            <FolderTreeView
+              currentPath={'/'}
+              items={treeData}
+              loading={!treeLoaded}
+              error={error}
+              selectedPath={currentPath}
+              onOpen={handleTreeOpenOrSelect}
+              onSelect={handleTreeOpenOrSelect}
+              onContextMenu={() => {}}
+              onRetry={() => loadTreeItems(true)}
+            />
+          </div>
+
+          {/* Folder View */}
+          <div className="h-full min-h-0">
+            <FolderView
+              items={items}
+              loading={loading}
+              error={error}
+              selectedPath={selectedName ? (currentPath === '/' ? `/${selectedName}` : `${currentPath}/${selectedName}`) : null}
+              onOpen={handleOpen}
+              onSelect={handleSelect}
+              onContextMenu={() => {}}
+              viewStyle="grid"
+            />
+          </div>
+        </ResizablePanels>
       </div>
 
       {/* Bottom Section */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <span className="w-20 shrink-0 text-right">{selectionMode === "folder" ? "Folder name:" : "File name:"}</span>
+          <span className="w-20 shrink-0 text-right">{selectionMode === 'folder' ? 'Folder name:' : 'File name:'}</span>
           <input
             value={selectedName}
             onChange={(e) => setSelectedName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+            onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
             className="flex-1 h-6 border border-[#808080] bg-white text-xs px-2 focus:outline-none shadow-[inset_1px_1px_1px_rgba(0,0,0,0.2)]"
           />
           <button

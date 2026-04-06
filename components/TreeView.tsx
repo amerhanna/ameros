@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { type MouseEvent, type ReactNode, useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export interface TreeNode {
   path: string;
   name: string;
-  type: string | "drive" | "dir" | "file";
-  status?: "granted" | "denied" | "prompt";
+  type: string | 'drive' | 'dir' | 'file';
+  status?: 'granted' | 'denied' | 'prompt';
 }
 
 export interface TreeViewProps<TItem> {
@@ -45,9 +45,24 @@ export function TreeView<TItem extends TreeNode>({
 }: TreeViewProps<TItem>) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set(defaultExpanded));
 
+  // Compare the actual string values to prevent the array-reference re-render trap.
+  // Merge new default keys instead of nuking the user's manual expansion state.
   useEffect(() => {
-    setExpandedKeys(new Set(defaultExpanded));
-  }, [defaultExpanded]);
+    if (defaultExpanded.length === 0) return;
+
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      defaultExpanded.forEach((key) => {
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultExpanded.join(',')]);
 
   const toggleExpand = (key: string) => {
     setExpandedKeys((prev) => {
@@ -75,7 +90,7 @@ export function TreeView<TItem extends TreeNode>({
       <div key={key}>
         <div
           className={`flex items-center gap-2 py-1 px-2 rounded cursor-pointer select-none transition-colors ${
-            isSelected ? "bg-[#cce8ff] text-slate-900" : "text-slate-700 hover:bg-[#e5f3ff]"
+            isSelected ? 'bg-[#cce8ff] text-slate-900' : 'text-slate-700 hover:bg-[#e5f3ff]'
           }`}
           style={{ paddingLeft: 10 + depth * 16 }}
           onClick={() => onSelect?.(item)}
@@ -108,9 +123,7 @@ export function TreeView<TItem extends TreeNode>({
           <div className="relative w-5 h-5 flex items-center justify-center">
             {icon}
             {statusIcon && (
-              <div className="absolute -right-1 -bottom-1 rounded-full bg-white p-0.5 border border-slate-200 shadow-sm">
-                {statusIcon}
-              </div>
+              <div className="absolute -right-1 -bottom-1 rounded-full bg-white p-0.5 border border-slate-200 shadow-sm">{statusIcon}</div>
             )}
           </div>
           <span className="truncate">{label}</span>

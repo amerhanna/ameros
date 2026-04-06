@@ -36,7 +36,7 @@ const applicationRegistry: ApplicationRegistry = {
   FileExplorer: {
     component: FileExplorer,
     icon: '📁',
-    width: 400,
+    width: 600,
     height: 400,
     resizable: true,
     minWidth: 300,
