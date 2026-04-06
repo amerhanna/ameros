@@ -11,8 +11,8 @@ import ResizablePanels from '@/components/ui/layout/ResizablePanels';
 
 interface SystemDialogFrameProps {
   confirmLabel: string;
-  initialPath?: string;
-  selectionMode: 'file' | 'save' | 'folder';
+  initialPath?: string;/*  */
+  selectionMode: 'file' | 'save' | 'folder';/*  */
   onConfirm: (path: string) => void;
   onCancel: () => void;
   fileFilter?: (node: VFSNode) => boolean;
@@ -79,19 +79,17 @@ export function SystemDialogFrame({
   }, [loadFolderItems]);
 
   const loadTreeItems = useCallback(
-    async (forceRefresh: boolean = false) => {
-      try {
-        if (!treeLoaded || forceRefresh) {
-          const tree = await vfs.getTree();
-          setTreeData(tree);
-          setTreeLoaded(true);
-        }
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    },
-    [treeLoaded]
-  );
+    async () => {
+    try {
+      const tree = await vfs.getTree();
+      setTreeData(tree);
+      setTreeLoaded(true);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }, 
+  [treeLoaded]
+);
 
   useEffect(() => {
     loadFolder(initialPath);
@@ -114,7 +112,9 @@ export function SystemDialogFrame({
       const letter = node.path.split(':')[0];
       const granted = await vfs.requestPermission(letter);
       if (granted) {
+        setCurrentPath(node.path);
         loadFolderItems();
+        loadTreeItems();
         setHistory((prev) => [...prev, currentPath]);
         loadFolder(node.path);
         if (selectionMode === 'folder') {
@@ -138,18 +138,6 @@ export function SystemDialogFrame({
       if (selectionMode === 'file' || selectionMode === 'save') {
         const path = currentPath === '/' ? `/${node.name}` : `${currentPath}/${node.name}`;
         onConfirm(path);
-      }
-    }
-  };
-
-  const handleTreeOpenOrSelect = (item: VFSNode) => {
-    if (item.type === 'drive' || item.type === 'dir') {
-      setHistory((prev) => [...prev, currentPath]);
-      loadFolder(item.path);
-      if (selectionMode === 'folder') {
-        setSelectedName(item.name);
-      } else {
-        setSelectedName('');
       }
     }
   };
@@ -201,7 +189,7 @@ export function SystemDialogFrame({
       try {
         await vfs.mkdir(`${currentPath}/${name}`);
         loadFolder(currentPath);
-        loadTreeItems(true); // Refresh tree
+        loadTreeItems(); // Refresh tree
       } catch (err) {
         alert('Failed to create folder');
       }
@@ -250,10 +238,10 @@ export function SystemDialogFrame({
               loading={!treeLoaded}
               error={error}
               selectedPath={currentPath}
-              onOpen={handleTreeOpenOrSelect}
-              onSelect={handleTreeOpenOrSelect}
+              onOpen={handleOpen}
+              onSelect={handleOpen}
               onContextMenu={() => {}}
-              onRetry={() => loadTreeItems(true)}
+              onRetry={() => loadTreeItems()}
             />
           </div>
 
