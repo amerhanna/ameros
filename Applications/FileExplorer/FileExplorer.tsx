@@ -1,78 +1,102 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { useSystemActions } from "@/hooks/useSystemActions";
-import { useWindowActions } from "@/hooks/useWindowActions";
-import { vfs, type VFSNode } from "@/lib/vfs";
-import { type MenuItemType } from "@/components/WindowManager/Menu";
-import ContextMenu from "@/components/WindowManager/ContextMenu";
-import { toast } from "sonner";
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSystemActions } from '@/hooks/useSystemActions';
+import { useWindowActions } from '@/hooks/useWindowActions';
+import { vfs, type VFSNode, type FolderTreeNode } from '@/lib/vfs';
+import { type MenuItemType } from '@/components/WindowManager/Menu';
+import ContextMenu from '@/components/WindowManager/ContextMenu';
+import { toast } from 'sonner';
 
 // Internal Components
-import { FolderView } from "@/components/FolderView";
-import { NameInputDialog } from "./components/NameInputDialog";
-import { FileProperties } from "./components/FileProperties";
-import { Toolbar } from "./components/Toolbar";
-import { StatusBar } from "./components/StatusBar";
-import { useClipboard } from "@/lib/clipboard";
+import { FolderView } from '@/components/FolderView';
+import { FolderTreeView } from '@/components/FolderTreeView';
+import { NameInputDialog } from './components/NameInputDialog';
+import { FileProperties } from './components/FileProperties';
+import { Toolbar } from './components/Toolbar';
+import { StatusBar } from './components/StatusBar';
+import ResizablePanels from '@/components/ui/layout/ResizablePanels';
+import { useClipboard } from '@/lib/clipboard';
 
 export default function FileExplorer() {
   const { launchApp } = useSystemActions();
   const { openChildWindow } = useWindowActions();
-  const [currentPath, setCurrentPath] = useState("/");
+  const [currentPath, setCurrentPath] = useState('/');
   const [items, setItems] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [treeLoaded, setTreeLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { cut, copy, clear, clipboard } = useClipboard();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [treeData, setTreeData] = useState<FolderTreeNode[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: VFSNode | null } | null>(null);
 
-  const initVFS = useCallback(async () => {
+  const loadFolderItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      await vfs.init();
       const content = await vfs.ls(currentPath);
       setItems(content);
     } catch (err) {
       setError((err as Error).message);
-      toast.error("VFS Error: " + (err as Error).message);
+      toast.error('VFS Error: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
   }, [currentPath]);
 
   useEffect(() => {
-    initVFS();
-  }, [initVFS]);
+    loadFolderItems();
+  }, [loadFolderItems]);
+
+  const loadTreeItems = useCallback(
+    async () => {
+      try {
+          const tree = await vfs.getTree();
+          setTreeData(tree);
+          setTreeLoaded(true);
+      } catch (err) {
+        setError((err as Error).message);
+        toast.error('VFS Error: ' + (err as Error).message);
+      }
+    },
+    [treeLoaded]
+  );
+
+  useEffect(() => {
+    loadTreeItems();
+  }, [loadTreeItems]);
 
   const handleOpen = async (node: VFSNode) => {
-    if (node.status === "prompt") {
-      const letter = node.path.split(":")[0];
+    if (node.status === 'prompt') {
+      const letter = node.path.split(':')[0];
       const granted = await vfs.requestPermission(letter);
       if (granted) {
-        initVFS();
+        setCurrentPath(node.path);
+        setSelectedPath(null);
+        loadFolderItems();
+        loadTreeItems();
       }
       return;
     }
 
-    if (node.type === "dir") {
+    if (node.type === 'dir' || node.type === 'drive') {
       setCurrentPath(node.path);
       setSelectedPath(null);
     } else {
-      if (node.name.toLowerCase().endsWith(".txt")) {
+      if (node.name.toLowerCase().endsWith('.txt')) {
         try {
           const content = await vfs.readFile(node.path);
           const textContent =
             content instanceof Blob
               ? await content.text()
               : content instanceof ArrayBuffer
-                ? new TextDecoder().decode(content)
-                : typeof content === "string"
-                  ? content
-                  : "";
+              ? new TextDecoder().decode(content)
+              : typeof content === 'string'
+              ? content
+              : '';
 
-          launchApp("TextEditor", {
+          launchApp('TextEditor', {
             title: `${node.name} - Text Editor`,
             launchArgs: {
               filePath: node.path,
@@ -80,31 +104,30 @@ export default function FileExplorer() {
             },
           });
         } catch (err) {
-          toast.error("Failed to read file");
+          toast.error('Failed to read file');
         }
       } else {
-        toast("File type not supported", { description: "Opening binary files is coming soon!" });
+        toast('File type not supported', { description: 'Opening binary files is coming soon!' });
       }
     }
   };
 
   const handleBack = () => {
-    if (currentPath === "/" || currentPath === "" || currentPath === "/") return;
+    if (currentPath === '/' || currentPath === '' || currentPath === '/') return;
 
-    // If it's a drive root like "C:", go to "/"
     if (currentPath.match(/^[A-Z]:$/)) {
-      setCurrentPath("/");
+      setCurrentPath('/');
       setSelectedPath(null);
       return;
     }
 
-    const lastSlash = currentPath.lastIndexOf("/");
+    const lastSlash = currentPath.lastIndexOf('/');
     if (lastSlash === -1) {
-      setCurrentPath("/");
+      setCurrentPath('/');
       setSelectedPath(null);
     } else {
       const newPath = currentPath.substring(0, lastSlash);
-      setCurrentPath(newPath || (currentPath.includes(":") ? currentPath.split(":")[0] + ":" : "/"));
+      setCurrentPath(newPath || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/'));
       setSelectedPath(null);
     }
   };
@@ -112,16 +135,16 @@ export default function FileExplorer() {
   const handleMount = async () => {
     try {
       const handle = await (window as any).showDirectoryPicker({
-        mode: "readwrite",
+        mode: 'readwrite',
       });
       const letter = await vfs.mountFolder(handle);
       await vfs.requestPermission(letter);
-      initVFS();
-      toast.success("Folder mounted successfully");
+      loadFolderItems();
+      toast.success('Folder mounted successfully');
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        console.error("Mount failed", err);
-        toast.error("Failed to mount folder");
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Mount failed', err);
+        toast.error('Failed to mount folder');
       }
     }
   };
@@ -131,20 +154,20 @@ export default function FileExplorer() {
   const handleDelete = async (path: string) => {
     try {
       await vfs.delete(path);
-      initVFS();
-      toast.success("Deleted successfully");
+      loadFolderItems();
+      toast.success('Deleted successfully');
     } catch (err) {
-      toast.error("Failed to delete");
+      toast.error('Failed to delete');
     }
   };
 
   const handleRename = async (path: string) => {
-    let oldName = path.split("/").pop() || "";
+    let oldName = path.split('/').pop() || '';
     if (path.match(/^[A-Z]:$/)) {
       oldName = await vfs.getVolumeLabel(path[0]);
     }
     openChildWindow({
-      title: "Rename",
+      title: 'Rename',
       component: () => (
         <NameInputDialog
           initialValue={oldName}
@@ -152,10 +175,10 @@ export default function FileExplorer() {
           onConfirm={async (newName) => {
             try {
               await vfs.rename(path, newName);
-              initVFS();
-              toast.success("Renamed successful");
+              loadFolderItems();
+              toast.success('Renamed successful');
             } catch (err) {
-              toast.error("Failed to rename");
+              toast.error('Failed to rename');
             }
           }}
         />
@@ -168,9 +191,9 @@ export default function FileExplorer() {
   };
 
   const handleNewFolder = () => {
-    if (currentPath === "/") return;
+    if (currentPath === '/') return;
     openChildWindow({
-      title: "New Folder",
+      title: 'New Folder',
       component: () => (
         <NameInputDialog
           initialValue="New Folder"
@@ -178,10 +201,11 @@ export default function FileExplorer() {
           onConfirm={async (name) => {
             try {
               await vfs.mkdir(`${currentPath}/${name}`);
-              initVFS();
-              toast.success("Folder created");
+              loadFolderItems();
+              loadTreeItems();
+              toast.success('Folder created');
             } catch (err) {
-              toast.error("Failed to create folder");
+              toast.error('Failed to create folder');
             }
           }}
         />
@@ -194,9 +218,9 @@ export default function FileExplorer() {
   };
 
   const handleNewFile = () => {
-    if (currentPath === "/") return;
+    if (currentPath === '/') return;
     openChildWindow({
-      title: "New File",
+      title: 'New File',
       component: () => (
         <NameInputDialog
           initialValue="New Text Document.txt"
@@ -204,10 +228,10 @@ export default function FileExplorer() {
           onConfirm={async (name) => {
             try {
               await vfs.touch(`${currentPath}/${name}`);
-              initVFS();
-              toast.success("File created");
+              loadFolderItems();
+              toast.success('File created');
             } catch (err) {
-              toast.error("Failed to create file");
+              toast.error('Failed to create file');
             }
           }}
         />
@@ -221,40 +245,40 @@ export default function FileExplorer() {
 
   const handleCut = (path: string) => {
     cut(path, {
-      onSuccess: () => toast.info("Item cut to clipboard"),
-      onError: () => toast.error("Failed to cut item")
+      onSuccess: () => toast.info('Item cut to clipboard'),
+      onError: () => toast.error('Failed to cut item'),
     });
   };
 
   const handleCopy = (path: string) => {
     copy(path, {
-      onSuccess: () => toast.info("Item copied to clipboard"),
-      onError: () => toast.error("Failed to copy item")
+      onSuccess: () => toast.info('Item copied to clipboard'),
+      onError: () => toast.error('Failed to copy item'),
     });
   };
 
   const handlePaste = async () => {
-    if (!clipboard || clipboard.itemType !== "file" || currentPath === "/") return;
-    const name = clipboard.item.split("/").pop() || "unknown";
+    if (!clipboard || clipboard.itemType !== 'file' || currentPath === '/') return;
+    const name = clipboard.item.split('/').pop() || 'unknown';
     const dest = `${currentPath}/${name}`;
 
     try {
-      if (clipboard.action === "copy") {
+      if (clipboard.action === 'copy') {
         await vfs.copy(clipboard.item, dest);
       } else {
         await vfs.move(clipboard.item, dest);
-        clear(); // Clear cut clipboard
+        clear();
       }
-      initVFS();
+      loadFolderItems();
       toast.success(`Pasted into ${currentPath}`);
     } catch (err) {
-      toast.error("Failed to paste items");
+      toast.error('Failed to paste items');
     }
   };
 
   const handleProperties = (path: string) => {
     openChildWindow({
-      title: "Properties",
+      title: 'Properties',
       component: () => <FileProperties path={path} />,
       width: 320,
       height: 420,
@@ -279,32 +303,32 @@ export default function FileExplorer() {
   // --- Render logic ---
 
   const driveMenuItems: MenuItemType[] = [
-    { type: "item", label: "Open", action: () => handleOpen(contextMenu!.item!), icon: "📁" },
-    { type: "separator" },
-    { type: "item", label: "Rename", action: () => handleRename(contextMenu!.item!.path) },
-    { type: "item", label: "Properties", action: () => handleProperties(contextMenu!.item!.path), icon: "ℹ️" },
+    { type: 'item', label: 'Open', action: () => handleOpen(contextMenu!.item!), icon: '📁' },
+    { type: 'separator' },
+    { type: 'item', label: 'Rename', action: () => handleRename(contextMenu!.item!.path) },
+    { type: 'item', label: 'Properties', action: () => handleProperties(contextMenu!.item!.path), icon: 'ℹ️' },
   ];
 
   const fileMenuItems: MenuItemType[] = [
-    { type: "item", label: "Open", action: () => handleOpen(contextMenu!.item!), bold: true },
-    { type: "separator" },
-    { type: "item", label: "Cut", action: () => handleCut(contextMenu!.item!.path), icon: "✂️" },
-    { type: "item", label: "Copy", action: () => handleCopy(contextMenu!.item!.path), icon: "📋" },
-    { type: "separator" },
-    { type: "item", label: "Delete", action: () => handleDelete(contextMenu!.item!.path), icon: "🗑️" },
-    { type: "item", label: "Rename", action: () => handleRename(contextMenu!.item!.path) },
-    { type: "separator" },
-    { type: "item", label: "Properties", action: () => handleProperties(contextMenu!.item!.path), icon: "ℹ️" },
+    { type: 'item', label: 'Open', action: () => handleOpen(contextMenu!.item!), bold: true },
+    { type: 'separator' },
+    { type: 'item', label: 'Cut', action: () => handleCut(contextMenu!.item!.path), icon: '✂️' },
+    { type: 'item', label: 'Copy', action: () => handleCopy(contextMenu!.item!.path), icon: '📋' },
+    { type: 'separator' },
+    { type: 'item', label: 'Delete', action: () => handleDelete(contextMenu!.item!.path), icon: '🗑️' },
+    { type: 'item', label: 'Rename', action: () => handleRename(contextMenu!.item!.path) },
+    { type: 'separator' },
+    { type: 'item', label: 'Properties', action: () => handleProperties(contextMenu!.item!.path), icon: 'ℹ️' },
   ];
 
-  const isThisPC = currentPath === "/";
+  const isThisPC = currentPath === '/';
 
   const emptySpaceMenuItems: MenuItemType[] = [
-    { type: "item", label: "Paste", action: handlePaste, disabled: !clipboard || isThisPC, icon: "📥" },
-    { type: "separator" },
-    { type: "item", label: "New Folder", action: handleNewFolder, disabled: isThisPC, icon: "📁" },
-    { type: "item", label: "New File", action: handleNewFile, disabled: isThisPC, icon: "📄" },
-    { type: "item", label: "Refresh", action: initVFS, icon: "🔄" },
+    { type: 'item', label: 'Paste', action: handlePaste, disabled: !clipboard || isThisPC, icon: '📥' },
+    { type: 'separator' },
+    { type: 'item', label: 'New Folder', action: handleNewFolder, disabled: isThisPC, icon: '📁' },
+    { type: 'item', label: 'New File', action: handleNewFile, disabled: isThisPC, icon: '📄' },
+    { type: 'item', label: 'Refresh', action: loadFolderItems, icon: '🔄' },
   ];
 
   return (
@@ -312,20 +336,40 @@ export default function FileExplorer() {
       className="flex flex-col h-full bg-[#f0f0f0] text-slate-900 font-sans select-none border border-[#808080]"
       onClick={closeContextMenu}
     >
-      <Toolbar currentPath={currentPath} canGoBack={currentPath !== "/"} onBack={handleBack} onMount={handleMount} />
+      <Toolbar currentPath={currentPath} canGoBack={currentPath !== '/'} onBack={handleBack} onMount={handleMount} />
 
       <div className="flex-1 overflow-hidden bg-white m-1 border border-[#808080] shadow-inner relative">
-        <FolderView
-          items={items}
-          loading={loading}
-          error={error}
-          clipboard={clipboard}
-          selectedPath={selectedPath}
-          onOpen={handleOpen}
-          onSelect={handleSelect}
-          onContextMenu={handleContextMenu}
-          onRetry={initVFS}
-        />
+        <ResizablePanels direction="horizontal" initialSizes={[25, 75]} minSize={100} className="h-full">
+          {/* Sidebar */}
+          <div className="h-full border-r border-slate-200">
+            <FolderTreeView
+              currentPath={'/'}
+              items={treeData}
+              loading={!treeLoaded}
+              error={error}
+              selectedPath={currentPath}
+              onOpen={handleOpen}
+              onSelect={handleOpen}
+              onContextMenu={() => {}}
+              onRetry={() => loadTreeItems()}
+            />
+          </div>
+
+          {/* Main Content */}
+          <div className="h-full">
+            <FolderView
+              items={items}
+              loading={loading}
+              error={error}
+              clipboard={clipboard}
+              selectedPath={selectedPath}
+              onOpen={handleOpen}
+              onSelect={handleSelect}
+              onContextMenu={handleContextMenu}
+              onRetry={loadFolderItems}
+            />
+          </div>
+        </ResizablePanels>
 
         {contextMenu && (
           <ContextMenu
@@ -334,9 +378,9 @@ export default function FileExplorer() {
             items={
               !contextMenu.item
                 ? emptySpaceMenuItems
-                : contextMenu.item.path === "C:" || contextMenu.item.path.endsWith(":")
-                  ? driveMenuItems
-                  : fileMenuItems
+                : contextMenu.item.path === 'C:' || contextMenu.item.path.endsWith(':')
+                ? driveMenuItems
+                : fileMenuItems
             }
             onDismiss={closeContextMenu}
           />
