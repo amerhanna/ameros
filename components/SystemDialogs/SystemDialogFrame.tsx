@@ -7,7 +7,7 @@ import { vfs, type VFSNode, type FolderTreeNode } from '@/lib/vfs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronUp, FolderPlus } from 'lucide-react';
-import ResizablePanels from '@/components/ui/layout/ResizablePanels';
+import ResizablePanels from '@/components/layout/ResizablePanels';
 
 interface SystemDialogFrameProps {
   confirmLabel: string;
