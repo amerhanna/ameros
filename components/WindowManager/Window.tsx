@@ -186,7 +186,6 @@ export default function Window({
       resize: resizeWindowWithEvent,
       close: closeWindow,
       launchArgs,
-      menuBar,
       setMenuBar,
       setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => {
         setBeforeClose?.(fn);
@@ -195,7 +194,7 @@ export default function Window({
         return openChildWindow?.(config) ?? null;
       },
     }),
-    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, menuBar, setBeforeClose, openChildWindow],
+    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow],
   );
 
   useEffect(() => {

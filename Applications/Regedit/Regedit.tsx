@@ -14,9 +14,6 @@ import { toast } from "sonner";
 import { Folder, RefreshCw, FileText } from "lucide-react";
 import RegistryValueEditorWindow from "./components/RegistryValueEditorWindow";
 import SearchWindow from "./components/SearchWindow";
-import { debug } from "console";
-
-let debugUseEffectDependencyArray: any[] = [];
 
 const ROOT_HIVE_KEYS = ["HKEY_CLASSES_ROOT", "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE", "HKEY_USERS", "HKEY_CURRENT_CONFIG"];
 
@@ -286,7 +283,7 @@ export default function Regedit() {
       title: "Find",
       component: SearchWindow,
       launchArgs: {
-        entries: [],
+        entries,
         onOpen: (item: RegistryValueItem) => {
           setSelectedKey(item.parentPath);
           setSelectedValuePath(item.fullPath);
@@ -297,22 +294,9 @@ export default function Regedit() {
       modal: false,
       resizable: false,
     });
-  }, [openChildWindow]);
+  }, [entries, openChildWindow]);
 
   useEffect(() => {
-    if (debugUseEffectDependencyArray.length === 4) {
-      const hasHandleNewKeyChanged = debugUseEffectDependencyArray[0] !== handleNewKey;
-      const hasHandleNewValueChanged = debugUseEffectDependencyArray[1] !== handleNewValue;
-      const hasLoadRegistryChanged = debugUseEffectDependencyArray[2] !== loadRegistry;
-      const hasHandleOpenSearchChanged = debugUseEffectDependencyArray[3] !== handleOpenSearch;
-      console.log("useEffect dependencies changed:", {
-        handleNewKey:{changed: hasHandleNewKeyChanged, old: debugUseEffectDependencyArray[0], new: handleNewKey},
-        handleNewValue:{changed: hasHandleNewValueChanged, old: debugUseEffectDependencyArray[1], new: handleNewValue},
-        loadRegistry:{changed: hasLoadRegistryChanged, old: debugUseEffectDependencyArray[2], new: loadRegistry},
-        handleOpenSearch:{changed: hasHandleOpenSearchChanged, old: debugUseEffectDependencyArray[3], new: handleOpenSearch},
-      });
-    }
-    debugUseEffectDependencyArray = [handleNewKey, handleNewValue, loadRegistry, handleOpenSearch];
     setMenuBar([
       {
         type: "submenu",
@@ -335,14 +319,14 @@ export default function Regedit() {
         items: [{ type: "item", label: "About Registry Editor", action: () => toast("AmerOS Registry Editor") }],
       },
     ]);
-  }, [handleNewKey, handleNewValue, loadRegistry, handleOpenSearch]); // handleNewKey, handleNewValue, loadRegistry, handleOpenSearch
+  }, [handleNewKey, handleNewValue, loadRegistry, handleOpenSearch]);
 
   return (
     <div className="flex flex-col h-full bg-[#d4d0c8] text-slate-900 select-none border border-[#808080]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#808080] bg-[#ebebe7]">
         <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 flex-1 min-w-0">
           <div className="text-xs text-slate-500 whitespace-nowrap">Selected key:</div>
-          <div className="truncate font-mono bg-white px-1 border border-[#808080] flex-1 select-text">{selectedKey}</div>
+          <div className="truncate font-mono bg-white px-1 border border-[#808080] flex-1">{selectedKey}</div>
         </div>
         <div className="border-l border-[#808080] h-5" />
         <Button variant="ghost" size="sm" onClick={loadRegistry} className="px-3 py-1">
