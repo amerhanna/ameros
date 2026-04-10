@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import type React from 'react';
-import { Button } from '@/components/ui/button';
+import type React from "react";
+import { Button } from "@/components/ui/button";
 
 interface WindowTitleBarProps {
   title: string;
@@ -42,7 +42,7 @@ function TitleBarButtons({
       {(minimizable || maximizable) && (
         <Button
           variant="ghost"
-          className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
+          className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20 cursor-default`}
           onClick={onMinimize}
         >
           _
@@ -51,20 +51,18 @@ function TitleBarButtons({
       {(minimizable || maximizable) && (
         <Button
           variant="ghost"
-          className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
+          className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${
+            !maximizable ? "opacity-30 cursor-default" : buttonHoverClass
+          } cursor-default`}
           onClick={(e) => {
             if (!maximizable) return;
             onMaximize(e);
           }}
         >
-          {isMaximized ? '❐' : '□'}
+          {isMaximized ? "❐" : "□"}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-        onClick={onClose}
-      >
+      <Button variant="ghost" className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20 cursor-default`} onClick={onClose}>
         ×
       </Button>
     </div>
@@ -87,19 +85,24 @@ export default function WindowTitleBar({
   onMaximize,
   onClose,
 }: WindowTitleBarProps) {
-  const titleBarClass = isActive ? 'bg-blue-900 text-white' : 'bg-gray-500 text-gray-200';
+  const titleBarClass = isActive ? "bg-blue-900 text-white" : "bg-gray-500 text-gray-200";
 
   return (
     <div
-      className={`${titleBarClass} px-2 py-1 flex justify-between items-center select-none flex-shrink-0 ${
-        isMaximized ? 'cursor-default' : 'cursor-move'
-      }`}
+      className={`${titleBarClass} px-2 py-1 flex justify-between items-center select-none flex-shrink-0 cursor-default`}
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
       <div className="flex items-center gap-2 overflow-hidden">
-        <span className="text-base flex-shrink-0 cursor-default" onMouseDown={onIconClick}>
+        <span
+          className="text-base flex-shrink-0 cursor-default"
+          onMouseDown={onIconClick}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onIconClick(e);
+          }}
+        >
           {icon}
         </span>
         <span className="text-sm font-bold truncate">{title}</span>
