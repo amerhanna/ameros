@@ -361,6 +361,7 @@ export default function FileExplorer() {
               items={items}
               loading={loading}
               error={error}
+              viewStyle='details'
               clipboard={clipboard}
               selectedPath={selectedPath}
               onOpen={handleOpen}
