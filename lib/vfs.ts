@@ -671,6 +671,22 @@ class VFS {
     });
   }
 
+  async unmountFolder(letter: string): Promise<void> {
+    await this.init();
+    if (letter === 'C') throw new Error('Cannot unmount boot drive');
+    if (!this.mounts[letter]) return;
+
+    delete this.mounts[letter];
+    const transaction = this.db!.transaction(STORE_MOUNTS, 'readwrite');
+    const store = transaction.objectStore(STORE_MOUNTS);
+    store.delete(letter);
+
+    return new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
   async getMounts() {
     await this.init();
     return Object.keys(this.mounts).map((letter) => this.mounts[letter]);

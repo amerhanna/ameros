@@ -89,7 +89,7 @@ export function ItemView<TItem>({
               {columnNames.map((col, i) => (
                 <th
                   key={col}
-                  className={`text-[12px] font-normal text-slate-600 px-2 py-1 border-r border-slate-100 last:border-r-0 hover:bg-slate-50 cursor-default ${
+                  className={`text-[12px] font-normal text-slate-600 px-2 py-1 border-r border-slate-100 last:border-r-0 hover:bg-slate-50 cursor-default whitespace-nowrap overflow-hidden text-ellipsis ${
                     i === 0 ? "w-[40%]" : ""
                   }`}
                 >

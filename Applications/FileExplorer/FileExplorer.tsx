@@ -21,8 +21,21 @@ import { useClipboard } from '@/lib/clipboard';
 export default function FileExplorer() {
   const { launchApp } = useSystemActions();
   const { openChildWindow } = useWindowActions();
-  const [currentPath, setCurrentPath] = useState('/');
+  const [history, setHistory] = useState<string[]>(['/']);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const currentPath = history[historyIndex] || '/';
   const [items, setItems] = useState<VFSNode[]>([]);
+
+  const navigateTo = useCallback((path: string) => {
+    if (path === currentPath) return;
+    setHistory((prev) => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(path);
+      return newHistory;
+    });
+    setHistoryIndex((prev) => prev + 1);
+    setSelectedPath(null);
+  }, [currentPath, historyIndex]);
   const [loading, setLoading] = useState(true);
   const [treeLoaded, setTreeLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +85,7 @@ export default function FileExplorer() {
       const letter = node.path.split(':')[0];
       const granted = await vfs.requestPermission(letter);
       if (granted) {
-        setCurrentPath(node.path);
-        setSelectedPath(null);
+        navigateTo(node.path);
         loadFolderItems();
         loadTreeItems();
       }
@@ -81,8 +93,7 @@ export default function FileExplorer() {
     }
 
     if (node.type === 'dir' || node.type === 'drive') {
-      setCurrentPath(node.path);
-      setSelectedPath(null);
+      navigateTo(node.path);
     } else {
       if (node.name.toLowerCase().endsWith('.txt')) {
         try {
@@ -113,22 +124,33 @@ export default function FileExplorer() {
   };
 
   const handleBack = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex((prev) => prev - 1);
+      setSelectedPath(null);
+    }
+  };
+
+  const handleForward = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex((prev) => prev + 1);
+      setSelectedPath(null);
+    }
+  };
+
+  const handleUp = () => {
     if (currentPath === '/' || currentPath === '' || currentPath === '/') return;
 
     if (currentPath.match(/^[A-Z]:$/)) {
-      setCurrentPath('/');
-      setSelectedPath(null);
+      navigateTo('/');
       return;
     }
 
     const lastSlash = currentPath.lastIndexOf('/');
-    if (lastSlash === -1) {
-      setCurrentPath('/');
-      setSelectedPath(null);
+    if (lastSlash === -1 || lastSlash === 0) {
+      navigateTo('/');
     } else {
       const newPath = currentPath.substring(0, lastSlash);
-      setCurrentPath(newPath || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/'));
-      setSelectedPath(null);
+      navigateTo(newPath || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/'));
     }
   };
 
@@ -147,6 +169,26 @@ export default function FileExplorer() {
         toast.error('Failed to mount folder');
       }
     }
+  };
+
+  const handleUnmount = async () => {
+    const pathTarget = selectedPath;
+    if (pathTarget && pathTarget.match(/^[A-Z]:\/?$/) && !pathTarget.startsWith('C:')) {
+      const letter = pathTarget[0];
+      try {
+        await vfs.unmountFolder(letter);
+        navigateTo('/');
+        loadFolderItems();
+        loadTreeItems();
+        toast.success(`Drive ${letter}: unmounted`);
+      } catch (err) {
+        toast.error('Failed to unmount drive');
+      }
+    }
+  };
+
+  const handlePathChange = (path: string) => {
+    navigateTo(path);
   };
 
   // --- Context Menu Actions ---
@@ -326,8 +368,11 @@ export default function FileExplorer() {
   const emptySpaceMenuItems: MenuItemType[] = [
     { type: 'item', label: 'Paste', action: handlePaste, disabled: !clipboard || isThisPC, icon: '📥' },
     { type: 'separator' },
-    { type: 'item', label: 'New Folder', action: handleNewFolder, disabled: isThisPC, icon: '📁' },
-    { type: 'item', label: 'New File', action: handleNewFile, disabled: isThisPC, icon: '📄' },
+    { type:'submenu', label:'New', items: [
+      { type: 'item', label: 'Folder', action: handleNewFolder, disabled: isThisPC, icon: '📁' },
+      { type: 'item', label: 'File', action: handleNewFile, disabled: isThisPC, icon: '📄' },
+    ]},
+    { type: 'separator' },
     { type: 'item', label: 'Refresh', action: loadFolderItems, icon: '🔄' },
   ];
 
@@ -336,7 +381,20 @@ export default function FileExplorer() {
       className="flex flex-col h-full bg-[#f0f0f0] text-slate-900 font-sans select-none border border-[#808080]"
       onClick={closeContextMenu}
     >
-      <Toolbar currentPath={currentPath} canGoBack={currentPath !== '/'} onBack={handleBack} onMount={handleMount} />
+      <Toolbar 
+        currentPath={currentPath} 
+        canGoBack={historyIndex > 0} 
+        onBack={handleBack} 
+        canGoForward={historyIndex < history.length - 1}
+        onForward={handleForward}
+        canGoUp={currentPath !== '/'}
+        onUp={handleUp}
+        canMount={currentPath === '/'}
+        onMount={handleMount} 
+        canUnmount={selectedPath !== null && selectedPath.match(/^[A-Z]:\/?$/) !== null && !selectedPath.startsWith('C:')}
+        onUnmount={handleUnmount}
+        onPathChange={handlePathChange}
+      />
 
       <div className="flex-1 overflow-hidden bg-white m-1 border border-[#808080] shadow-inner relative">
         <ResizablePanels direction="horizontal" initialSizes={[25, 75]} minSize={100} className="h-full">
