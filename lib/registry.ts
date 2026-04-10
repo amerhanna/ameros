@@ -7,13 +7,24 @@ import { vfs } from "./vfs";
  * Lives on C:/Windows/System32/config/
  */
 
-export type RegistryValue = string | number | boolean | object;
+export type RegistryValue = string | number | boolean | object | null;
+export type RegistryValueType = 'string' | 'number' | 'boolean' | 'object';
 
-export interface RegistryEntry {
-  path: string; // e.g., "HKEY_LOCAL_MACHINE/Software/Mounts"
-  value: RegistryValue;
-  lastModified: number;
+export interface RegistryKeyNode {
+  name: string;
+  type: 'key';
+  content: RegistryNode[];
 }
+
+export interface RegistryValueNode {
+  name: string;
+  type: RegistryValueType;
+  content: RegistryValue;
+}
+
+export type RegistryNode = RegistryKeyNode | RegistryValueNode;
+
+
 
 class Registry {
   private isInitialized = false;
@@ -60,7 +71,7 @@ class Registry {
   async get<T>(path: string, defaultValue: T): Promise<T> {
     await this.ensureInitialized();
     try {
-      const hive = await this.loadHive();
+      const hive = await this.loadHiveFlat();
       return hive[path] !== undefined ? (hive[path] as T) : defaultValue;
     } catch {
       return defaultValue;
@@ -69,33 +80,204 @@ class Registry {
 
   async set(path: string, value: RegistryValue): Promise<void> {
     await this.ensureInitialized();
-    const hive = await this.loadHive();
-    hive[path] = value;
-    await this.saveHive(hive);
-    
+    const rawHive = await this.loadHiveRaw();
+    this.setValueNode(rawHive, path, value);
+    await this.saveHiveRaw(rawHive);
     window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value } }));
   }
 
   async getAll(): Promise<Record<string, RegistryValue>> {
     await this.ensureInitialized();
-    return await this.loadHive();
+    return await this.loadHiveFlat();
   }
 
-  private async loadHive(): Promise<Record<string, RegistryValue>> {
+  private async loadHiveRaw(): Promise<RegistryNode[]> {
     try {
-      if (!(await vfs.exists(this.HIVE_PATH))) return {};
+      if (!(await vfs.exists(this.HIVE_PATH))) return this.getDefaultHive();
       const content = await vfs.readFile(this.HIVE_PATH);
       const text = typeof content === 'string' ? content : await (content as Blob).text();
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+
+      if (Array.isArray(parsed) && parsed.every((node) => this.isRegistryNode(node))) {
+        return parsed as RegistryNode[];
+      }
+
+      if (parsed && typeof parsed === 'object') {
+        return this.migrateLegacyHive(parsed as Record<string, RegistryValue>);
+      }
+
+      return this.getDefaultHive();
     } catch (e) {
       console.error("Registry: Hive corrupted. AmerOS may fail to boot.", e);
-      return {};
+      return this.getDefaultHive();
     }
   }
 
-  private async saveHive(data: Record<string, RegistryValue>): Promise<void> {
+  private async loadHiveFlat(): Promise<Record<string, RegistryValue>> {
+    const rawHive = await this.loadHiveRaw();
+    return this.flattenHive(rawHive);
+  }
+
+  private async saveHiveRaw(data: RegistryNode[]): Promise<void> {
     const content = JSON.stringify(data, null, 2);
     await vfs.writeFile(this.HIVE_PATH, content);
+  }
+
+  private flattenHive(nodes: RegistryNode[], parentPath = ""): Record<string, RegistryValue> {
+    const result: Record<string, RegistryValue> = {};
+
+    for (const node of nodes) {
+      if (node.type === 'key') {
+        const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+
+        for (const child of node.content) {
+          if (child.type === 'key') {
+            Object.assign(result, this.flattenHive([child], currentPath));
+          } else {
+            const entryPath = child.name === 'default' ? currentPath : `${currentPath}/${child.name}`;
+            result[entryPath] = child.content;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private setValueNode(nodes: RegistryNode[], path: string, value: RegistryValue): void {
+    const keyPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : path;
+    const valueName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : 'default';
+    const keyNode = this.ensureKeyNode(nodes, keyPath);
+    const valueNode: RegistryValueNode = {
+      name: valueName,
+      type: this.getValueType(value),
+      content: value,
+    };
+
+    const existingIndex = keyNode.content.findIndex(
+      (child): child is RegistryValueNode => child.type !== 'key' && child.name === valueName
+    );
+
+    if (existingIndex >= 0) {
+      keyNode.content[existingIndex] = valueNode;
+    } else {
+      keyNode.content.push(valueNode);
+    }
+  }
+
+  private ensureKeyNode(nodes: RegistryNode[], path: string): RegistryKeyNode {
+    const keyMap = new Map<string, RegistryKeyNode>();
+
+    const buildIndex = (currentNodes: RegistryNode[], currentPath = "") => {
+      for (const node of currentNodes) {
+        if (node.type === 'key') {
+          const fullPath = currentPath ? `${currentPath}/${node.name}` : node.name;
+          keyMap.set(fullPath, node);
+          buildIndex(node.content, fullPath);
+        }
+      }
+    };
+
+    buildIndex(nodes);
+
+    const createOrGet = (fullPath: string): RegistryKeyNode => {
+      if (keyMap.has(fullPath)) {
+        return keyMap.get(fullPath)!;
+      }
+
+      const name = fullPath.split('/').pop() ?? fullPath;
+      const newNode: RegistryKeyNode = { name, type: 'key', content: [] };
+      keyMap.set(fullPath, newNode);
+
+      if (fullPath.includes('/')) {
+        const parentPath = fullPath.slice(0, fullPath.lastIndexOf('/'));
+        const parent = createOrGet(parentPath);
+        parent.content.push(newNode);
+      } else {
+        nodes.push(newNode);
+      }
+
+      return newNode;
+    };
+
+    return createOrGet(path);
+  }
+
+  private migrateLegacyHive(hive: Record<string, RegistryValue>): RegistryNode[] {
+    const roots: RegistryNode[] = [];
+    const keyMap = new Map<string, RegistryKeyNode>();
+
+    const ensureKey = (fullPath: string): RegistryKeyNode => {
+      if (keyMap.has(fullPath)) {
+        return keyMap.get(fullPath)!;
+      }
+
+      const name = fullPath.split('/').pop() ?? fullPath;
+      const node: RegistryKeyNode = { name, type: 'key', content: [] };
+      keyMap.set(fullPath, node);
+
+      if (fullPath.includes('/')) {
+        const parentPath = fullPath.slice(0, fullPath.lastIndexOf('/'));
+        const parent = ensureKey(parentPath);
+        parent.content.push(node);
+      } else {
+        roots.push(node);
+      }
+
+      return node;
+    };
+
+    for (const fullPath of Object.keys(hive)) {
+      const value = hive[fullPath];
+      const keyPath = fullPath.includes('/') ? fullPath.slice(0, fullPath.lastIndexOf('/')) : fullPath;
+      const valueName = fullPath.includes('/') ? fullPath.slice(fullPath.lastIndexOf('/') + 1) : 'default';
+      const keyNode = ensureKey(keyPath);
+      const existingIndex = keyNode.content.findIndex(
+        (child): child is RegistryValueNode => child.type !== 'key' && child.name === valueName
+      );
+      const valueNode: RegistryValueNode = {
+        name: valueName,
+        type: this.getValueType(value),
+        content: value,
+      };
+
+      if (existingIndex >= 0) {
+        keyNode.content[existingIndex] = valueNode;
+      } else {
+        keyNode.content.push(valueNode);
+      }
+    }
+
+    return roots;
+  }
+
+  private getValueType(value: RegistryValue): RegistryValueType {
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'string') return 'string';
+    return 'object';
+  }
+
+  private isRegistryNode(node: any): node is RegistryNode {
+    if (!node || typeof node !== 'object' || typeof node.name !== 'string' || typeof node.type !== 'string') {
+      return false;
+    }
+
+    if (node.type === 'key') {
+      return Array.isArray(node.content) && node.content.every((child: any) => this.isRegistryNode(child));
+    }
+
+    return 'content' in node;
+  }
+
+  private getDefaultHive(): RegistryNode[] {
+    return [
+      { name: 'HKEY_CLASSES_ROOT', type: 'key', content: [] },
+      { name: 'HKEY_CURRENT_USER', type: 'key', content: [] },
+      { name: 'HKEY_LOCAL_MACHINE', type: 'key', content: [] },
+      { name: 'HKEY_USERS', type: 'key', content: [] },
+      { name: 'HKEY_CURRENT_CONFIG', type: 'key', content: [] },
+    ];
   }
 
   /** Groundwork for Setup/Recovery: Wipes the system hive */
