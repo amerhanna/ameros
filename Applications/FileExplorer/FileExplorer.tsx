@@ -326,8 +326,16 @@ export default function FileExplorer() {
   const emptySpaceMenuItems: MenuItemType[] = [
     { type: 'item', label: 'Paste', action: handlePaste, disabled: !clipboard || isThisPC, icon: '📥' },
     { type: 'separator' },
-    { type: 'item', label: 'New Folder', action: handleNewFolder, disabled: isThisPC, icon: '📁' },
-    { type: 'item', label: 'New File', action: handleNewFile, disabled: isThisPC, icon: '📄' },
+    {
+      type: 'submenu',
+      label: 'New',
+      icon: '✚',
+      items: [
+        { type: 'item', label: 'Folder', action: handleNewFolder, disabled: isThisPC, icon: '📁' },
+        { type: 'item', label: 'File', action: handleNewFile, disabled: isThisPC, icon: '📄' },
+      ],
+    },
+    { type: 'separator' },
     { type: 'item', label: 'Refresh', action: loadFolderItems, icon: '🔄' },
   ];
 

@@ -115,11 +115,18 @@ const startMenuItems: StartMenuItem[] = [
   { label: 'Demo Application', component: 'DemoApp' },
   { label: 'Common Dialog Demo', component: 'CommonDialogDemo' },
   { label: 'History Explorer', component: 'DeepSeekHistory' },
-  { label: 'App Installer', component: 'Installer' },
   { label: 'Test Close', component: 'TestCloseApp' },
   { type: 'separator' },
   { label: 'Settings', component: 'Settings' },
-  { label: 'Registry Editor', component: 'Regedit' },
+  {
+    type: 'submenu',
+    label: 'Utilities',
+    icon: '🧰',
+    items: [
+      { label: 'Registry Editor', component: 'Regedit' },
+      { label: 'App Installer', component: 'Installer' },
+    ],
+  },
   { type: 'separator' },
   {
     icon: '🔌',

@@ -1,10 +1,13 @@
 "use client";
 
+import type React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { registry, RegistryValue } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { TreeView, type TreeNode } from "@/components/TreeView";
 import { ItemView } from "@/components/ItemView";
+import { type MenuItemType } from "@/components/WindowManager/Menu";
+import ContextMenu from "@/components/WindowManager/ContextMenu";
 import ResizablePanels from "@/components/layout/ResizablePanels";
 import { useWindowActions } from "@/hooks/useWindowActions";
 import { toast } from "sonner";
@@ -64,6 +67,12 @@ export default function Regedit() {
   const [entries, setEntries] = useState<Record<string, RegistryValue>>({});
   const [selectedKey, setSelectedKey] = useState(ROOT_HIVE_KEYS[0]);
   const [selectedValuePath, setSelectedValuePath] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    activeKey: string;
+    valueItem: RegistryValueItem | null;
+  } | null>(null);
 
   const loadRegistry = useCallback(async () => {
     try {
@@ -157,59 +166,117 @@ export default function Regedit() {
     });
   }, [entries, selectedKey]);
 
-  const handleNewKey = useCallback(() => {
-    openChildWindow({
-      title: "New Registry Key",
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "newKey",
-        selectedKey,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow, selectedKey]);
+  const handleNewKey = useCallback(
+    (parentKey?: string) => {
+      const key = parentKey ?? selectedKey;
+      openChildWindow({
+        title: "New Registry Key",
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "newKey",
+          selectedKey: key,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow, selectedKey]
+  );
 
-  const handleNewValue = useCallback(() => {
-    openChildWindow({
-      title: "New Registry Value",
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "newValue",
-        selectedKey,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow, selectedKey]);
+  const handleNewValue = useCallback(
+    (parentKey?: string) => {
+      const key = parentKey ?? selectedKey;
+      openChildWindow({
+        title: "New Registry Value",
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "newValue",
+          selectedKey: key,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow, selectedKey]
+  );
 
-  const handleEditValue = useCallback((item: RegistryValueItem) => {
-    openChildWindow({
-      title: `Edit Value: ${item.valueName}`,
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "editValue",
-        selectedKey: item.parentPath,
-        valueName: item.valueName,
-        value: item.value,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow]);
+  const handleEditValue = useCallback(
+    (item: RegistryValueItem) => {
+      openChildWindow({
+        title: `Edit Value: ${item.valueName}`,
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "editValue",
+          selectedKey: item.parentPath,
+          valueName: item.valueName,
+          value: item.value,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow]
+  );
 
+  const handleContextMenu = (e: React.MouseEvent<Element>, treeNode: RegistryTreeNode | null, valueItem: RegistryValueItem | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const activeKey = valueItem ? valueItem.parentPath : treeNode ? treeNode.path : selectedKey;
+    if (treeNode) {
+      setSelectedKey(treeNode.path);
+      setSelectedValuePath(null);
+    }
+    if (valueItem) {
+      setSelectedKey(valueItem.parentPath);
+      setSelectedValuePath(valueItem.fullPath);
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      activeKey,
+      valueItem,
+    });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
+
+  const contextMenuItems: MenuItemType[] = [];
+
+  if (contextMenu?.valueItem) {
+    contextMenuItems.push({
+      type: "item",
+      label: "Edit Value",
+      action: () => handleEditValue(contextMenu.valueItem!),
+      icon: "✏️",
+    });
+    contextMenuItems.push({ type: "separator" });
+  }
+
+  contextMenuItems.push({
+    type: "submenu",
+    label: "New",
+    icon: "✚",
+    items: [
+      { type: "item", label: "Key", action: () => handleNewKey(contextMenu?.activeKey), icon: "🗂️" },
+      { type: "item", label: "Value", action: () => handleNewValue(contextMenu?.activeKey), icon: "📄" },
+    ],
+  });
+  contextMenuItems.push({ type: "separator" });
+  contextMenuItems.push({ type: "item", label: "Refresh", action: loadRegistry, shortcut: "F5", icon: "🔄" });
 
   const handleOpenSearch = useCallback(() => {
     openChildWindow({
@@ -252,7 +319,7 @@ export default function Regedit() {
         items: [{ type: "item", label: "About Registry Editor", action: () => toast("AmerOS Registry Editor") }],
       },
     ]);
-  }, []);
+  }, [handleNewKey]); // handleNewKey, handleNewValue, loadRegistry, handleOpenSearch
 
   return (
     <div className="flex flex-col h-full bg-[#d4d0c8] text-slate-900 select-none border border-[#808080]">
@@ -282,7 +349,7 @@ export default function Regedit() {
               getChildren={(node) => node.children}
               onSelect={(node) => setSelectedKey(node.path)}
               onOpen={(node) => setSelectedKey(node.path)}
-              onContextMenu={() => {}}
+              onContextMenu={(e, node) => handleContextMenu(e, node, null)}
             />
           </div>
 
@@ -301,10 +368,11 @@ export default function Regedit() {
                 setSelectedValuePath(item.fullPath);
                 handleEditValue(item);
               }}
-              onContextMenu={() => {}}
+              onContextMenu={(e, item) => handleContextMenu(e, null, item)}
             />
           </div>
         </ResizablePanels>
+        {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextMenuItems} onDismiss={closeContextMenu} />}
       </div>
     </div>
   );

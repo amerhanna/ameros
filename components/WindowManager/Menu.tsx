@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from "react";
 
 /**
  * Menu Item Type
  */
 export type MenuItemType =
-  | { type: 'item'; label: string; action: () => void; disabled?: boolean; shortcut?: string; bold?: boolean; icon?: string }
-  | { type: 'separator' }
-  | { type: 'submenu'; label: string; items: MenuItemType[]; disabled?: boolean; icon?: string };
+  | { type: "item"; label: string; action: () => void; disabled?: boolean; shortcut?: string; bold?: boolean; icon?: string }
+  | { type: "separator" }
+  | { type: "submenu"; label: string; items: MenuItemType[]; disabled?: boolean; icon?: string };
 
 /**
  * Menu Content Component
@@ -21,11 +21,11 @@ interface MenuContentProps {
   style?: React.CSSProperties;
 }
 
-export function MenuContent({ items, onClose, className = '', style }: MenuContentProps) {
+export function MenuContent({ items, onClose, className = "", style }: MenuContentProps) {
   const [activeSubmenuIndex, setActiveSubmenuIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close when clicking outside handled by the parent trigger usually, 
+  // Close when clicking outside handled by the parent trigger usually,
   // but for submenus we need to handle it.
 
   return (
@@ -33,10 +33,10 @@ export function MenuContent({ items, onClose, className = '', style }: MenuConte
       ref={containerRef}
       className={`bg-[#c0c0c0] border-2 py-0.5 min-w-[150px] select-none text-black z-[1000] shadow-[2px_2px_5px_rgba(0,0,0,0.5)] ${className}`}
       style={{
-        borderTopColor: '#ffffff',
-        borderLeftColor: '#ffffff',
-        borderRightColor: '#808080',
-        borderBottomColor: '#808080',
+        borderTopColor: "#ffffff",
+        borderLeftColor: "#ffffff",
+        borderRightColor: "#808080",
+        borderBottomColor: "#808080",
         ...style,
       }}
       onMouseDown={(e) => e.stopPropagation()}
@@ -45,8 +45,8 @@ export function MenuContent({ items, onClose, className = '', style }: MenuConte
         <MenuItem
           key={index}
           item={item}
-          isActive={activeSubmenuIndex === index}
-          onHover={() => setActiveSubmenuIndex(index)}
+          // isActive={activeSubmenuIndex === index}
+          // onHover={() => setActiveSubmenuIndex(index)}
           onClose={onClose}
         />
       ))}
@@ -59,32 +59,31 @@ export function MenuContent({ items, onClose, className = '', style }: MenuConte
  */
 interface MenuItemProps {
   item: MenuItemType;
-  isActive: boolean;
-  onHover: () => void;
   onClose: () => void;
 }
 
-function MenuItem({ item, isActive, onHover, onClose }: MenuItemProps) {
+function MenuItem({ item, onClose }: MenuItemProps) {
+  const [isActive, setActive] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
   const [submenuPos, setSubmenuPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (isActive && item.type === 'submenu' && itemRef.current) {
+    if (isActive && item.type === "submenu" && itemRef.current) {
       const rect = itemRef.current.getBoundingClientRect();
       setSubmenuPos({ x: rect.right - 4, y: rect.top - 2 });
     }
   }, [isActive, item.type]);
 
-  if (item.type === 'separator') {
+  if (item.type === "separator") {
     return <div className="h-[1px] bg-gray-400 my-1 mx-1 border-b border-white" />;
   }
 
   const isDisabled = item.disabled;
-  const isSubmenu = item.type === 'submenu';
-  
+  const isSubmenu = item.type === "submenu";
+
   const handleAction = () => {
     if (isDisabled) return;
-    if (item.type === 'item') {
+    if (item.type === "item") {
       item.action();
       onClose();
     }
@@ -94,13 +93,10 @@ function MenuItem({ item, isActive, onHover, onClose }: MenuItemProps) {
     <div
       ref={itemRef}
       className={`relative px-4 py-0.5 flex justify-between items-center text-xs sm:text-sm cursor-default leading-tight ${
-        isDisabled 
-          ? 'text-gray-500' 
-          : isActive 
-            ? 'bg-[#000080] text-white' 
-            : 'text-black'
+        isDisabled ? "text-gray-500" : isActive ? "bg-[#000080] text-white" : "text-black"
       }`}
-      onMouseEnter={onHover}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
       onMouseDown={(e) => {
         e.stopPropagation();
         handleAction();
@@ -108,20 +104,14 @@ function MenuItem({ item, isActive, onHover, onClose }: MenuItemProps) {
     >
       <div className="flex items-center gap-2">
         {item.icon && <span className="w-4 h-4 flex items-center justify-center">{item.icon}</span>}
-        <span className={item.type === 'item' && item.bold ? 'font-bold' : ''}>
-          {item.label}
-        </span>
+        <span className={item.type === "item" && item.bold ? "font-bold" : ""}>{item.label}</span>
       </div>
-      
-      {item.type === 'item' && item.shortcut && (
-        <span className={`ml-4 ${isActive ? 'text-white' : 'text-gray-600'} opacity-80`}>
-          {item.shortcut}
-        </span>
+
+      {item.type === "item" && item.shortcut && (
+        <span className={`ml-4 ${isActive ? "text-white" : "text-gray-600"} opacity-80`}>{item.shortcut}</span>
       )}
-      
-      {isSubmenu && (
-        <span className="ml-4">▶</span>
-      )}
+
+      {isSubmenu && <span className="ml-4">▶</span>}
 
       {isSubmenu && isActive && (
         <div className="fixed" style={{ left: submenuPos.x, top: submenuPos.y }}>
