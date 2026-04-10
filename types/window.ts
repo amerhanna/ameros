@@ -35,6 +35,12 @@ export type StartMenuItem = {
   icon: string
   action: () => void
   type: "action"
+} | {
+  type: "submenu"
+  label: string
+  items: StartMenuItem[]
+  icon?: string
+  disabled?: boolean
 }
 
 export interface PersistentWindowState extends WindowConfig {

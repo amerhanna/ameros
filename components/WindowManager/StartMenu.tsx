@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-import { Button } from "@/components/ui/button"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
+import { MenuContent, type MenuItemType } from "./Menu"
 import type { StartMenuItem, WindowConfig, ApplicationRegistry } from "@/types/window"
-import Image from "next/image"
 
 interface StartMenuProps {
   isOpen: boolean
@@ -12,6 +11,40 @@ interface StartMenuProps {
   onOpenWindow: (config: Partial<WindowConfig> & { component: string }) => void
   items: StartMenuItem[]
   applicationRegistry: ApplicationRegistry
+}
+
+function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps["onOpenWindow"], applicationRegistry: ApplicationRegistry): MenuItemType[] {
+  return items.map((item) => {
+    if (item.type === "separator") {
+      return { type: "separator" }
+    }
+
+    if (item.type === "action") {
+      return {
+        type: "item",
+        label: item.label,
+        icon: item.icon,
+        action: item.action,
+      }
+    }
+
+    if (item.type === "submenu") {
+      return {
+        type: "submenu",
+        label: item.label,
+        icon: item.icon,
+        disabled: item.disabled,
+        items: mapStartMenuItems(item.items, onOpenWindow, applicationRegistry),
+      }
+    }
+
+    return {
+      type: "item",
+      label: item.label,
+      icon: applicationRegistry[item.component]?.icon,
+      action: () => onOpenWindow({ component: item.component, launchArgs: item.launchArgs }),
+    }
+  })
 }
 
 export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applicationRegistry }: StartMenuProps) {
@@ -37,18 +70,9 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
     }
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  const menuItems = useMemo(() => mapStartMenuItems(items, onOpenWindow, applicationRegistry), [items, onOpenWindow, applicationRegistry])
 
-  const handleItemClick = (item: StartMenuItem) => {
-    if (item.type === "action") {
-      item.action()
-    } else if (item.type === "item" || !item.type) {
-      if ('component' in item) {
-        onOpenWindow({ component: item.component, launchArgs: item.launchArgs })
-      }
-    }
-    onClose()
-  }
+  if (!isOpen) return null
 
   return (
     <div
@@ -69,35 +93,12 @@ export default function StartMenu({ isOpen, onClose, onOpenWindow, items, applic
 
       {/* Menu Items */}
       <div className="py-1">
-        {items.map((item, index) => {
-          if (item.type === "separator") {
-            return <div key={index} className="h-px bg-gray-400 mx-2 my-1" />
-          }
-
-          const icon = item.type === "action"
-            ? item.icon
-            : applicationRegistry[item.component]?.icon || item.launchArgs?.iconUrl || '🌐';
-          const isIconUrl = typeof icon === 'string' && icon.startsWith('http');
-          const label = item.label
-
-          return (
-            <Button
-              key={index}
-              variant="ghost"
-              className="w-full justify-start px-3 py-1.5 h-auto text-left hover:bg-blue-600 hover:text-white rounded-none border-0"
-              onClick={() => handleItemClick(item)}
-            >
-              <span className="mr-3 text-lg flex items-center justify-center w-6 h-6">
-                {isIconUrl ? (
-                  <Image src={icon} width={16} height={16} alt="icon" className="rounded" />
-                ) : (
-                  icon
-                )}
-              </span>
-              <span className="text-sm font-medium">{label}</span>
-            </Button>
-          )
-        })}
+        <MenuContent
+          items={menuItems}
+          onClose={onClose}
+          className="bg-transparent border-none shadow-none min-w-full"
+          style={{ backgroundColor: 'transparent', boxShadow: 'none' }}
+        />
       </div>
     </div>
   )

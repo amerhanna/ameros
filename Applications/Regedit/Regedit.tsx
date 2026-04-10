@@ -1,10 +1,13 @@
 "use client";
 
+import type React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { registry, RegistryValue } from "@/lib/registry";
+import { registry, RegistryValue, RegistryNode } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { TreeView, type TreeNode } from "@/components/TreeView";
 import { ItemView } from "@/components/ItemView";
+import { type MenuItemType } from "@/components/WindowManager/Menu";
+import ContextMenu from "@/components/WindowManager/ContextMenu";
 import ResizablePanels from "@/components/layout/ResizablePanels";
 import { useWindowActions } from "@/hooks/useWindowActions";
 import { toast } from "sonner";
@@ -62,13 +65,21 @@ const getRegistryValueType = (value: RegistryValue) => {
 export default function Regedit() {
   const { openChildWindow, setMenuBar } = useWindowActions();
   const [entries, setEntries] = useState<Record<string, RegistryValue>>({});
+  const [rawHive, setRawHive] = useState<RegistryNode[]>([]);
   const [selectedKey, setSelectedKey] = useState(ROOT_HIVE_KEYS[0]);
   const [selectedValuePath, setSelectedValuePath] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    activeKey: string;
+    valueItem: RegistryValueItem | null;
+  } | null>(null);
 
   const loadRegistry = useCallback(async () => {
     try {
-      const allEntries = await registry.getAll();
+      const [allEntries, raw] = await Promise.all([registry.getAll(), registry.getAllRaw()]);
       setEntries(allEntries);
+      setRawHive(raw);
     } catch (error) {
       toast.error("Failed to load registry.");
     }
@@ -85,37 +96,19 @@ export default function Regedit() {
   }, [loadRegistry]);
 
   const treeItems = useMemo<RegistryTreeNode[]>(() => {
-    const nodes = new Map<string, RegistryTreeNode>();
-    const roots: RegistryTreeNode[] = [];
-
-    const addChild = (parent: RegistryTreeNode, child: RegistryTreeNode) => {
-      parent.children = parent.children ?? [];
-      if (!parent.children.some((node) => node.path === child.path)) {
-        parent.children.push(child);
-      }
+    const buildNode = (node: RegistryNode, path: string): RegistryTreeNode => {
+      const children = node.type === "key" ? node.content.filter((child) => child.type === "key") : [];
+      return {
+        path,
+        name: path.split("/").pop() ?? path,
+        type: "dir",
+        children: children.map((child) => buildNode(child, `${path}/${child.name}`)),
+      };
     };
 
-    const ensureNode = (path: string) => {
-      if (nodes.has(path)) return nodes.get(path)!;
-
-      const name = path.split("/").pop() ?? path;
-      const node: RegistryTreeNode = { path, name, type: "dir", children: [] };
-      nodes.set(path, node);
-
-      if (path.includes("/") && !ROOT_HIVE_KEYS.includes(path)) {
-        const parentPath = path.slice(0, path.lastIndexOf("/"));
-        const parent = ensureNode(parentPath);
-        addChild(parent, node);
-      } else {
-        roots.push(node);
-      }
-      return node;
-    };
-
-    ROOT_HIVE_KEYS.forEach((rootKey) => ensureNode(rootKey));
-    Object.keys(entries).forEach((entryPath) => {
-      const keyPath = getParentKeyPath(entryPath);
-      ensureNode(keyPath);
+    const roots: RegistryTreeNode[] = ROOT_HIVE_KEYS.map((rootKey) => {
+      const rootNode = rawHive.find((node) => node.type === "key" && node.name === rootKey);
+      return rootNode ? buildNode(rootNode, rootKey) : { path: rootKey, name: rootKey, type: "dir", children: [] };
     });
 
     const sortNodes = (list: RegistryTreeNode[]) => {
@@ -127,7 +120,7 @@ export default function Regedit() {
 
     sortNodes(roots);
     return roots;
-  }, [entries]);
+  }, [rawHive]);
 
   const valueItems = useMemo<RegistryValueItem[]>(() => {
     const items = Object.entries(entries)
@@ -157,59 +150,117 @@ export default function Regedit() {
     });
   }, [entries, selectedKey]);
 
-  const handleNewKey = useCallback(() => {
-    openChildWindow({
-      title: "New Registry Key",
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "newKey",
-        selectedKey,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow, selectedKey]);
+  const handleNewKey = useCallback(
+    (parentKey?: string) => {
+      const key = parentKey ?? selectedKey;
+      openChildWindow({
+        title: "New Registry Key",
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "newKey",
+          selectedKey: key,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow, selectedKey]
+  );
 
-  const handleNewValue = useCallback(() => {
-    openChildWindow({
-      title: "New Registry Value",
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "newValue",
-        selectedKey,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow, selectedKey]);
+  const handleNewValue = useCallback(
+    (parentKey?: string) => {
+      const key = parentKey ?? selectedKey;
+      openChildWindow({
+        title: "New Registry Value",
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "newValue",
+          selectedKey: key,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow, selectedKey]
+  );
 
-  const handleEditValue = useCallback((item: RegistryValueItem) => {
-    openChildWindow({
-      title: `Edit Value: ${item.valueName}`,
-      component: RegistryValueEditorWindow,
-      launchArgs: {
-        mode: "editValue",
-        selectedKey: item.parentPath,
-        valueName: item.valueName,
-        value: item.value,
-      },
-      width: 440,
-      height: 335,
-      modal: true,
-      resizable: false,
-      maximizable: false,
-      minimizable: false,
-    });
-  }, [openChildWindow]);
+  const handleEditValue = useCallback(
+    (item: RegistryValueItem) => {
+      openChildWindow({
+        title: `Edit Value: ${item.valueName}`,
+        component: RegistryValueEditorWindow,
+        launchArgs: {
+          mode: "editValue",
+          selectedKey: item.parentPath,
+          valueName: item.valueName,
+          value: item.value,
+        },
+        width: 440,
+        height: 335,
+        modal: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+      });
+    },
+    [openChildWindow]
+  );
 
+  const handleContextMenu = (e: React.MouseEvent<Element>, treeNode: RegistryTreeNode | null, valueItem: RegistryValueItem | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const activeKey = valueItem ? valueItem.parentPath : treeNode ? treeNode.path : selectedKey;
+    if (treeNode) {
+      setSelectedKey(treeNode.path);
+      setSelectedValuePath(null);
+    }
+    if (valueItem) {
+      setSelectedKey(valueItem.parentPath);
+      setSelectedValuePath(valueItem.fullPath);
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      activeKey,
+      valueItem,
+    });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
+
+  const contextMenuItems: MenuItemType[] = [];
+
+  if (contextMenu?.valueItem) {
+    contextMenuItems.push({
+      type: "item",
+      label: "Edit Value",
+      action: () => handleEditValue(contextMenu.valueItem!),
+      icon: "✏️",
+    });
+    contextMenuItems.push({ type: "separator" });
+  }
+
+  contextMenuItems.push({
+    type: "submenu",
+    label: "New",
+    icon: "✚",
+    items: [
+      { type: "item", label: "Key", action: () => handleNewKey(contextMenu?.activeKey), icon: "🗂️" },
+      { type: "item", label: "Value", action: () => handleNewValue(contextMenu?.activeKey), icon: "📄" },
+    ],
+  });
+  contextMenuItems.push({ type: "separator" });
+  contextMenuItems.push({ type: "item", label: "Refresh", action: loadRegistry, shortcut: "F5", icon: "🔄" });
 
   const handleOpenSearch = useCallback(() => {
     openChildWindow({
@@ -217,9 +268,15 @@ export default function Regedit() {
       component: SearchWindow,
       launchArgs: {
         entries,
-        onOpen: (item: RegistryValueItem) => {
-          setSelectedKey(item.parentPath);
-          setSelectedValuePath(item.fullPath);
+        rawHive,
+        onOpen: (item: { fullPath: string; parentPath: string; isKey?: boolean }) => {
+          if (item.isKey) {
+            setSelectedKey(item.fullPath);
+            setSelectedValuePath(null);
+          } else {
+            setSelectedKey(item.parentPath);
+            setSelectedValuePath(item.fullPath);
+          }
         },
       },
       width: 420,
@@ -227,7 +284,7 @@ export default function Regedit() {
       modal: false,
       resizable: false,
     });
-  }, [entries, openChildWindow]);
+  }, [entries, openChildWindow, rawHive]);
 
   useEffect(() => {
     setMenuBar([
@@ -252,7 +309,7 @@ export default function Regedit() {
         items: [{ type: "item", label: "About Registry Editor", action: () => toast("AmerOS Registry Editor") }],
       },
     ]);
-  }, []);
+  }, [handleNewKey, handleNewValue, loadRegistry, handleOpenSearch]);
 
   return (
     <div className="flex flex-col h-full bg-[#d4d0c8] text-slate-900 select-none border border-[#808080]">
@@ -282,7 +339,7 @@ export default function Regedit() {
               getChildren={(node) => node.children}
               onSelect={(node) => setSelectedKey(node.path)}
               onOpen={(node) => setSelectedKey(node.path)}
-              onContextMenu={() => {}}
+              onContextMenu={(e, node) => handleContextMenu(e, node, null)}
             />
           </div>
 
@@ -301,10 +358,11 @@ export default function Regedit() {
                 setSelectedValuePath(item.fullPath);
                 handleEditValue(item);
               }}
-              onContextMenu={() => {}}
+              onContextMenu={(e, item) => handleContextMenu(e, null, item)}
             />
           </div>
         </ResizablePanels>
+        {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextMenuItems} onDismiss={closeContextMenu} />}
       </div>
     </div>
   );
