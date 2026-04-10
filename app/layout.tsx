@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 }
 
 import { ClipboardProvider } from "@/lib/clipboard";
+import { RegistryProvider } from "@/lib/registry-provider";
 
 export default function RootLayout({
   children,
@@ -26,8 +27,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <ClipboardProvider>
-          {children}
-          <Analytics />
+          <RegistryProvider>
+            {children}
+            <Analytics />
+          </RegistryProvider>
         </ClipboardProvider>
       </body>
     </html>

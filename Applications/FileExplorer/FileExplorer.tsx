@@ -15,7 +15,7 @@ import { NameInputDialog } from './components/NameInputDialog';
 import { FileProperties } from './components/FileProperties';
 import { Toolbar } from './components/Toolbar';
 import { StatusBar } from './components/StatusBar';
-import ResizablePanels from '@/components/ui/layout/ResizablePanels';
+import ResizablePanels from '@/components/layout/ResizablePanels';
 import { useClipboard } from '@/lib/clipboard';
 
 export default function FileExplorer() {
@@ -361,6 +361,7 @@ export default function FileExplorer() {
               items={items}
               loading={loading}
               error={error}
+              viewStyle='details'
               clipboard={clipboard}
               selectedPath={selectedPath}
               onOpen={handleOpen}

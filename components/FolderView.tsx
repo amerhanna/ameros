@@ -10,13 +10,36 @@ interface FolderViewProps {
   loading?: boolean;
   error?: string | null;
   clipboard?: ClipboardState | null;
-  viewStyle?: "grid" | "list";
+  viewStyle?: "grid" | "list" | "details";
   selectedPath?: string | null;
   onOpen: (item: VFSNode) => void;
   onSelect?: (item: VFSNode) => void;
   onContextMenu: (e: React.MouseEvent, item: VFSNode | null) => void;
   onRetry?: () => void;
 }
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
+const formatDate = (timestamp: number) => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+};
+
+const formatFileType = (name: string, path: string, type: string) => {
+  if (type === "dir") return "File Folder";
+  if (type === "drive") {
+    if (path === "C:") return "Internal Storage";
+    return "Mounted Drive";
+  }
+  const ext = name.split(".").pop()?.toUpperCase() || "";
+  return ext ? `${ext} File` : "File";
+};
 
 export function FolderView({
   items,
@@ -48,14 +71,17 @@ export function FolderView({
     return <FileIcon className="w-10 h-10 text-slate-400" />;
   };
 
-  const getStatusIcon = (item: VFSNode) =>
-    item.status === "prompt" ? <Lock className="w-3 h-3 text-amber-500 fill-amber-500" /> : null;
+  const getStatusIcon = (item: VFSNode) => (item.status === "prompt" ? <Lock className="w-3 h-3 text-amber-500 fill-amber-500" /> : null);
 
   return (
     <ItemView<VFSNode>
       items={items}
       loading={loading}
       error={error}
+      columnNames={viewStyle === "details" ? ["Name", "Type", "Last Modified", "Size"] : undefined}
+      detailsMapper={
+        viewStyle === "details" ? (item) => [formatFileType(item.name, item.path, item.type), formatDate(item.lastModified), "not implemented yet"] : undefined
+      }
       clipboard={clipboard}
       viewStyle={viewStyle}
       selectedKey={selectedPath}
