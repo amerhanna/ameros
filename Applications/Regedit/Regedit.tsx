@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { registry, RegistryValue } from "@/lib/registry";
+import { registry, RegistryValue, RegistryNode } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { TreeView, type TreeNode } from "@/components/TreeView";
 import { ItemView } from "@/components/ItemView";
@@ -65,6 +65,7 @@ const getRegistryValueType = (value: RegistryValue) => {
 export default function Regedit() {
   const { openChildWindow, setMenuBar } = useWindowActions();
   const [entries, setEntries] = useState<Record<string, RegistryValue>>({});
+  const [rawHive, setRawHive] = useState<RegistryNode[]>([]);
   const [selectedKey, setSelectedKey] = useState(ROOT_HIVE_KEYS[0]);
   const [selectedValuePath, setSelectedValuePath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -76,8 +77,9 @@ export default function Regedit() {
 
   const loadRegistry = useCallback(async () => {
     try {
-      const allEntries = await registry.getAll();
+      const [allEntries, raw] = await Promise.all([registry.getAll(), registry.getAllRaw()]);
       setEntries(allEntries);
+      setRawHive(raw);
     } catch (error) {
       toast.error("Failed to load registry.");
     }
@@ -94,37 +96,19 @@ export default function Regedit() {
   }, [loadRegistry]);
 
   const treeItems = useMemo<RegistryTreeNode[]>(() => {
-    const nodes = new Map<string, RegistryTreeNode>();
-    const roots: RegistryTreeNode[] = [];
-
-    const addChild = (parent: RegistryTreeNode, child: RegistryTreeNode) => {
-      parent.children = parent.children ?? [];
-      if (!parent.children.some((node) => node.path === child.path)) {
-        parent.children.push(child);
-      }
+    const buildNode = (node: RegistryNode, path: string): RegistryTreeNode => {
+      const children = node.type === "key" ? node.content.filter((child) => child.type === "key") : [];
+      return {
+        path,
+        name: path.split("/").pop() ?? path,
+        type: "dir",
+        children: children.map((child) => buildNode(child, `${path}/${child.name}`)),
+      };
     };
 
-    const ensureNode = (path: string) => {
-      if (nodes.has(path)) return nodes.get(path)!;
-
-      const name = path.split("/").pop() ?? path;
-      const node: RegistryTreeNode = { path, name, type: "dir", children: [] };
-      nodes.set(path, node);
-
-      if (path.includes("/") && !ROOT_HIVE_KEYS.includes(path)) {
-        const parentPath = path.slice(0, path.lastIndexOf("/"));
-        const parent = ensureNode(parentPath);
-        addChild(parent, node);
-      } else {
-        roots.push(node);
-      }
-      return node;
-    };
-
-    ROOT_HIVE_KEYS.forEach((rootKey) => ensureNode(rootKey));
-    Object.keys(entries).forEach((entryPath) => {
-      const keyPath = getParentKeyPath(entryPath);
-      ensureNode(keyPath);
+    const roots: RegistryTreeNode[] = ROOT_HIVE_KEYS.map((rootKey) => {
+      const rootNode = rawHive.find((node) => node.type === "key" && node.name === rootKey);
+      return rootNode ? buildNode(rootNode, rootKey) : { path: rootKey, name: rootKey, type: "dir", children: [] };
     });
 
     const sortNodes = (list: RegistryTreeNode[]) => {
@@ -136,7 +120,7 @@ export default function Regedit() {
 
     sortNodes(roots);
     return roots;
-  }, [entries]);
+  }, [rawHive]);
 
   const valueItems = useMemo<RegistryValueItem[]>(() => {
     const items = Object.entries(entries)
@@ -284,9 +268,15 @@ export default function Regedit() {
       component: SearchWindow,
       launchArgs: {
         entries,
-        onOpen: (item: RegistryValueItem) => {
-          setSelectedKey(item.parentPath);
-          setSelectedValuePath(item.fullPath);
+        rawHive,
+        onOpen: (item: { fullPath: string; parentPath: string; isKey?: boolean }) => {
+          if (item.isKey) {
+            setSelectedKey(item.fullPath);
+            setSelectedValuePath(null);
+          } else {
+            setSelectedKey(item.parentPath);
+            setSelectedValuePath(item.fullPath);
+          }
         },
       },
       width: 420,
@@ -294,7 +284,7 @@ export default function Regedit() {
       modal: false,
       resizable: false,
     });
-  }, [entries, openChildWindow]);
+  }, [entries, openChildWindow, rawHive]);
 
   useEffect(() => {
     setMenuBar([

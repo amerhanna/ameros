@@ -86,6 +86,38 @@ class Registry {
     window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value } }));
   }
 
+  async createKey(path: string, defaultValue?: RegistryValue): Promise<void> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const keyNode = this.ensureKeyNode(rawHive, path);
+
+    if (defaultValue !== undefined) {
+      const valueNode: RegistryValueNode = {
+        name: 'default',
+        type: this.getValueType(defaultValue),
+        content: defaultValue,
+      };
+
+      const existingIndex = keyNode.content.findIndex(
+        (child): child is RegistryValueNode => child.type !== 'key' && child.name === 'default'
+      );
+
+      if (existingIndex >= 0) {
+        keyNode.content[existingIndex] = valueNode;
+      } else {
+        keyNode.content.push(valueNode);
+      }
+    }
+
+    await this.saveHiveRaw(rawHive);
+    window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: defaultValue } }));
+  }
+
+  async getAllRaw(): Promise<RegistryNode[]> {
+    await this.ensureInitialized();
+    return this.loadHiveRaw();
+  }
+
   async getAll(): Promise<Record<string, RegistryValue>> {
     await this.ensureInitialized();
     return await this.loadHiveFlat();
