@@ -74,9 +74,10 @@ const RegistryValueEditorWindow = ({
         toast.error("Key name is required.");
         return;
       }
-      const value = parseValue(valueText, valueType);
-      if (value === undefined) return;
-      await registry.set(`${selectedKey}/${key}`, value);
+      const defaultValue = parseValue(valueText, valueType);
+      if (defaultValue === undefined) return;
+      const newKeyPath = `${selectedKey}/${key}`;
+      await registry.createKey(newKeyPath, defaultValue === null ? undefined : defaultValue);
       toast.success("Key created.");
       close();
       return;

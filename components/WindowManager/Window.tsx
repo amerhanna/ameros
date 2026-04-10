@@ -1,14 +1,14 @@
 "use client"
 
-import type React from "react"
+import type React from "react";
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
 import { WindowContext, type ChildWindowConfig } from './WindowContext';
-import MenuBar from './MenuBar';
+import WindowTitleBar from './WindowTitleBar';
+import WindowResizeHandles from './WindowResizeHandles';
 import type { MenuItemType } from './Menu';
 import { useWindowStateById } from '@/hooks/useGetWindowState';
-import { useWindowActions } from '@/hooks/useWindowActions';
-import { flushPersistence } from '@/lib/window-store';
+import { useWindowDragResize } from './useWindowDragResize';
+import MenuBar from './MenuBar';
 
 interface WindowProps {
   id: string;
@@ -33,53 +33,6 @@ interface WindowProps {
   onContextMenu?: (id: string, x: number, y: number) => void;
   setBeforeClose?: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
   openChildWindow?: (config: ChildWindowConfig) => string | null;
-}
-
-function TitleBarButtons({
-  minimizable,
-  maximizable,
-  buttonHoverClass,
-  isMaximized,
-}: {
-  minimizable: boolean;
-  maximizable: boolean;
-  buttonHoverClass: string;
-  isMaximized: boolean;
-}) {
-  const { minimize, maximize, close } = useWindowActions();
-
-  return (
-    <div className="flex gap-1 ml-2">
-      {(minimizable || maximizable) && (
-        <Button
-          variant="ghost"
-          className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-          onClick={minimize}
-        >
-          _
-        </Button>
-      )}
-      {(minimizable || maximizable) && (
-        <Button
-          variant="ghost"
-          className={`h-5 w-5 p-0 min-w-0 text-current border border-white/20 ${!maximizable ? 'opacity-30 cursor-default' : buttonHoverClass}`}
-          onClick={(e) => {
-            if (!maximizable) return;
-            maximize(e);
-          }}
-        >
-          {isMaximized ? '❐' : '□'}
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        className={`h-5 w-5 p-0 min-w-0 text-current ${buttonHoverClass} border border-white/20`}
-        onClick={close}
-      >
-        ×
-      </Button>
-    </div>
-  );
 }
 
 export default function Window({
@@ -120,11 +73,6 @@ export default function Window({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState(false);
-  const [resizeDir, setResizeDir] = useState<string | null>(null);
-  const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
-  const [initialRect, setInitialRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [menuBar, setMenuBar] = useState<MenuItemType[] | undefined>();
   const prevActiveRef = useRef(isActive);
   const isMaximizedRef = useRef(isMaximized);
@@ -166,8 +114,21 @@ export default function Window({
   );
 
   const moveWindow = useCallback(
-    (e: React.MouseEvent | React.TouchEvent | undefined, nextX?: number, nextY?: number) => {
-      e?.stopPropagation();
+    (nextX: number, nextY: number) => {
+      onMove?.(id, nextX, nextY);
+    },
+    [id, onMove],
+  );
+
+  const resizeWindow = useCallback(
+    (nextWidth: number, nextHeight: number, nextX: number, nextY: number) => {
+      onResize?.(id, nextWidth, nextHeight, nextX, nextY);
+    },
+    [id, onResize],
+  );
+
+  const moveWindowWithEvent = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent, nextX?: number, nextY?: number) => {
       if (nextX !== undefined && nextY !== undefined) {
         onMove?.(id, nextX, nextY);
       }
@@ -175,15 +136,27 @@ export default function Window({
     [id, onMove],
   );
 
-  const resizeWindow = useCallback(
-    (e: React.MouseEvent | React.TouchEvent | undefined, nextWidth?: number, nextHeight?: number, nextX?: number, nextY?: number) => {
-      e?.stopPropagation();
+  const resizeWindowWithEvent = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent, nextWidth?: number, nextHeight?: number, nextX?: number, nextY?: number) => {
       if (nextWidth !== undefined && nextHeight !== undefined) {
         onResize?.(id, nextWidth, nextHeight, nextX, nextY);
       }
     },
     [id, onResize],
   );
+
+  const focusWindow = useCallback(() => {
+    onFocus?.(id);
+  }, [id, onFocus]);
+
+  const { startDragging, startResizing } = useWindowDragResize({
+    containerRef,
+    minWidth,
+    minHeight,
+    onMove: moveWindow,
+    onResize: resizeWindow,
+    onFocus: focusWindow,
+  });
 
   const closeWindow = useCallback(() => {
     onClose?.(id);
@@ -209,11 +182,10 @@ export default function Window({
       maximize: maximizeWindow,
       minimize: minimizeWindow,
       restore: restoreWindow,
-      move: moveWindow,
-      resize: resizeWindow,
+      move: moveWindowWithEvent,
+      resize: resizeWindowWithEvent,
       close: closeWindow,
       launchArgs,
-      menuBar,
       setMenuBar,
       setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => {
         setBeforeClose?.(fn);
@@ -222,7 +194,7 @@ export default function Window({
         return openChildWindow?.(config) ?? null;
       },
     }),
-    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, menuBar, setBeforeClose, openChildWindow],
+    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow],
   );
 
   useEffect(() => {
@@ -231,78 +203,6 @@ export default function Window({
     }
     prevActiveRef.current = isActive;
   }, [isActive, id, onBlur]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (dragging && initialRect) {
-        const dx = e.clientX - initialMouse.x;
-        const dy = e.clientY - initialMouse.y;
-        const newX = initialRect.x + dx;
-        const newY = initialRect.y + dy;
-        if (containerRef.current) {
-          containerRef.current.style.left = `${newX}px`;
-          containerRef.current.style.top = `${newY}px`;
-        }
-        onMove?.(id, newX, newY);
-      } else if (resizing && resizeDir && initialRect) {
-        const dx = e.clientX - initialMouse.x;
-        const dy = e.clientY - initialMouse.y;
-
-        let newW = initialRect.w;
-        let newH = initialRect.h;
-        let newX = initialRect.x;
-        let newY = initialRect.y;
-
-        if (resizeDir.includes('e')) newW = Math.max(minWidth, initialRect.w + dx);
-        if (resizeDir.includes('w')) {
-          const possibleW = initialRect.w - dx;
-          if (possibleW >= minWidth) {
-            newW = possibleW;
-            newX = initialRect.x + dx;
-          } else {
-            newW = minWidth;
-            newX = initialRect.x + initialRect.w - minWidth;
-          }
-        }
-        if (resizeDir.includes('s')) newH = Math.max(minHeight, initialRect.h + dy);
-        if (resizeDir.includes('n')) {
-          const possibleH = initialRect.h - dy;
-          if (possibleH >= minHeight) {
-            newH = possibleH;
-            newY = initialRect.y + dy;
-          } else {
-            newH = minHeight;
-            newY = initialRect.y + initialRect.h - minHeight;
-          }
-        }
-
-        if (containerRef.current) {
-          containerRef.current.style.width = `${newW}px`;
-          containerRef.current.style.height = `${newH}px`;
-          containerRef.current.style.left = `${newX}px`;
-          containerRef.current.style.top = `${newY}px`;
-        }
-        onResize?.(id, newW, newH, newX, newY);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setDragging(false);
-      setResizing(false);
-      setResizeDir(null);
-      flushPersistence();
-    };
-
-    if (dragging || resizing) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging, resizing, resizeDir, initialMouse, initialRect, id, minWidth, minHeight, onMove, onResize]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -317,7 +217,6 @@ export default function Window({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       const rect = e.currentTarget.getBoundingClientRect();
-      // Position below the icon
       onContextMenu?.(id, rect.left, rect.bottom);
       onFocus?.(id);
     },
@@ -338,127 +237,78 @@ export default function Window({
         top: `${y}px`,
       };
 
-  const startDragging = (e: React.MouseEvent) => {
-    if (isMaximized || !containerRef.current) return;
-    e.preventDefault();
-    setDragging(true);
-    setInitialMouse({ x: e.clientX, y: e.clientY });
-    setInitialRect({ x, y, w: width, h: height });
-    onFocus?.(id);
-  };
-
-  const startResizing = (e: React.MouseEvent, dir: string) => {
-    if (!resizable || isMaximized || !containerRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setResizing(true);
-    setResizeDir(dir);
-    setInitialMouse({ x: e.clientX, y: e.clientY });
-    setInitialRect({ x, y, w: width, h: height });
-    onFocus?.(id);
-  };
-
-  const handleWindowClick = () => {
-    onFocus?.(id);
-  };
-
   const handleDoubleClickTitleBar = () => {
     if (maximizable) {
       onMaximize?.(id);
     }
   };
 
-  // if (isMinimized) {
-  //   return null;
-  // }
-
   const titleBarClass = isActive ? 'bg-blue-900 text-white' : 'bg-gray-500 text-gray-200';
   const buttonHoverClass = isActive ? 'hover:bg-blue-700' : 'hover:bg-gray-400';
 
   return (
     <WindowContext.Provider value={windowContextValue}>
-    <div
-      ref={containerRef}
-      className="absolute bg-gray-200 border-2 border-white shadow-md flex flex-col overflow-hidden"
-      style={{
-        ...maximizedStyle,
-        zIndex,
-        display: isMinimized ? 'none' : 'flex',
-        borderTopColor: '#ffffff',
-        borderLeftColor: '#ffffff',
-        borderRightColor: '#808080',
-        borderBottomColor: '#808080',
-      }}
-      onClick={handleWindowClick}
-    >
-      {/* Resize handles */}
-      {!isMaximized && resizable && (
-        <>
-          <div className="absolute top-0 left-0 w-full h-1 cursor-ns-resize z-10" onMouseDown={(e) => startResizing(e, 'n')} />
-          <div className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize z-10" onMouseDown={(e) => startResizing(e, 's')} />
-          <div className="absolute top-0 left-0 h-full w-1 cursor-ew-resize z-10" onMouseDown={(e) => startResizing(e, 'w')} />
-          <div className="absolute top-0 right-0 h-full w-1 cursor-ew-resize z-10" onMouseDown={(e) => startResizing(e, 'e')} />
-          <div className="absolute top-0 left-0 w-2 h-2 cursor-nwse-resize z-20" onMouseDown={(e) => startResizing(e, 'nw')} />
-          <div className="absolute top-0 right-0 w-2 h-2 cursor-nesw-resize z-20" onMouseDown={(e) => startResizing(e, 'ne')} />
-          <div className="absolute bottom-0 left-0 w-2 h-2 cursor-nesw-resize z-20" onMouseDown={(e) => startResizing(e, 'sw')} />
-          <div className="absolute bottom-0 right-0 w-2 h-2 cursor-nwse-resize z-20" onMouseDown={(e) => startResizing(e, 'se')} />
-        </>
-      )}
-
-      {/* Title Bar */}
       <div
-        className={`${titleBarClass} px-2 py-1 flex justify-between items-center select-none flex-shrink-0 ${
-          isMaximized ? 'cursor-default' : 'cursor-move'
-        }`}
-        onMouseDown={startDragging}
-        onDoubleClick={handleDoubleClickTitleBar}
-        onContextMenu={handleContextMenu}
-      >
-        <div className="flex items-center gap-2 overflow-hidden">
-          <span className="text-base flex-shrink-0 cursor-default" onMouseDown={handleIconClick}>
-            {icon}
-          </span>
-          <span className="text-sm font-bold truncate">{title}</span>
-        </div>
-        <TitleBarButtons
-          minimizable={minimizable}
-          maximizable={maximizable}
-          buttonHoverClass={buttonHoverClass}
-          isMaximized={isMaximized}
-        />
-      </div>
-
-      {/* Menu Bar */}
-      {menuBar && (
-        <div className="flex-shrink-0">
-          <MenuBar items={menuBar} />
-        </div>
-      )}
-
-      {/* Content Area */}
-      <div
-        className="flex-grow overflow-auto relative bg-gray-200 border-2 border-gray-400 m-0.5"
+        ref={containerRef}
+        className="absolute bg-gray-200 border-2 border-white shadow-md flex flex-col overflow-hidden"
         style={{
-          borderTopColor: '#808080',
-          borderLeftColor: '#808080',
-          borderRightColor: '#ffffff',
-          borderBottomColor: '#ffffff',
+          ...maximizedStyle,
+          zIndex,
+          display: isMinimized ? 'none' : 'flex',
+          borderTopColor: '#ffffff',
+          borderLeftColor: '#ffffff',
+          borderRightColor: '#808080',
+          borderBottomColor: '#808080',
         }}
+        onClick={focusWindow}
       >
-        {children}
-        {/* Modal blocking overlay */}
-        {isBlocked && (
-          <div 
-            className="absolute inset-0 z-50"
-            style={{ cursor: 'not-allowed' }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onFocus?.(id);
-            }}
-          />
+        {!isMaximized && resizable && <WindowResizeHandles onStartResize={startResizing} />}
+
+        <WindowTitleBar
+          title={title}
+          icon={icon}
+          isActive={isActive}
+          isMaximized={isMaximized}
+          maximizable={maximizable}
+          minimizable={minimizable}
+          buttonHoverClass={buttonHoverClass}
+          onMouseDown={startDragging}
+          onIconClick={handleIconClick}
+          onContextMenu={handleContextMenu}
+          onDoubleClick={handleDoubleClickTitleBar}
+          onMinimize={minimizeWindow}
+          onMaximize={maximizeWindow}
+          onClose={closeWindow}
+        />
+
+        {menuBar && (
+          <div className="flex-shrink-0">
+            <MenuBar items={menuBar} />
+          </div>
         )}
+
+        <div
+          className="flex-grow overflow-auto relative bg-gray-200 border-2 border-gray-400 m-0.5"
+          style={{
+            borderTopColor: '#808080',
+            borderLeftColor: '#808080',
+            borderRightColor: '#ffffff',
+            borderBottomColor: '#ffffff',
+          }}
+        >
+          {children}
+          {isBlocked && (
+            <div
+              className="absolute inset-0 z-50"
+              style={{ cursor: 'not-allowed' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocus?.(id);
+              }}
+            />
+          )}
+        </div>
       </div>
-    </div>
     </WindowContext.Provider>
   );
 }

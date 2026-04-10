@@ -1,29 +1,74 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { RegistryValue } from "@/lib/registry";
+import { RegistryNode, RegistryValue } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { ItemView } from "@/components/ItemView";
 import { useWindowActions } from "@/hooks/useWindowActions";
 import { FileText } from "lucide-react";
 import { getParentKeyPath } from "../Regedit";
 
-const SearchWindow = ({ entries, onOpen }: { entries: Record<string, RegistryValue>; onOpen: (item: any) => void }) => {
+interface SearchResult {
+  fullPath: string;
+  label: string;
+  value?: RegistryValue;
+  parentPath: string;
+  isKey?: boolean;
+}
+
+const SearchWindow = ({
+  entries,
+  rawHive,
+  onOpen,
+}: {
+  entries: Record<string, RegistryValue>;
+  rawHive: RegistryNode[];
+  onOpen: (item: SearchResult) => void;
+}) => {
   const [query, setQuery] = useState("");
   const { close } = useWindowActions();
 
   const searchResults = useMemo(() => {
     const lowerQuery = query.toLowerCase();
-    return Object.entries(entries)
+
+    const collectKeys = (nodes: RegistryNode[], parentPath = ""): SearchResult[] => {
+      const results: SearchResult[] = [];
+      for (const node of nodes) {
+        if (node.type !== "key") continue;
+        const currentPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+        results.push({
+          fullPath: currentPath,
+          label: currentPath,
+          parentPath: currentPath,
+          isKey: true,
+        });
+        results.push(...collectKeys(node.content, currentPath));
+      }
+      return results;
+    };
+
+    const keyResults = collectKeys(rawHive).filter((result) => result.fullPath.toLowerCase().includes(lowerQuery));
+    const valueResults = Object.entries(entries)
       .filter(([fullPath]) => fullPath.toLowerCase().includes(lowerQuery))
       .map(([fullPath]) => ({
         fullPath,
         label: fullPath,
         value: entries[fullPath],
         parentPath: getParentKeyPath(fullPath),
-      }))
-      .slice(0, 100);
-  }, [query, entries]);
+      }));
+
+    const resultMap = new Map<string, SearchResult>();
+    for (const result of valueResults) {
+      resultMap.set(result.fullPath, result);
+    }
+    for (const result of keyResults) {
+      if (!resultMap.has(result.fullPath)) {
+        resultMap.set(result.fullPath, result);
+      }
+    }
+
+    return Array.from(resultMap.values()).slice(0, 100);
+  }, [query, entries, rawHive]);
 
   return (
     <div className="h-full bg-[#f5f5f5] p-4 flex flex-col gap-4">
