@@ -1,5 +1,7 @@
 'use client';
 
+import defaultVfs from './vfs-defaults';
+
 /**
  * AmerOS Virtual File System (VFS) - Phase 2
  * Persists to IndexedDB and supports external directory mounting via File System Access API.
@@ -109,27 +111,41 @@ class VFS {
     if (!readme) {
       // Direct IDB writes to bypass public methods (mkdir, writeFile, setVolumeLabel)
       // because they all call `await this.init()` now, which would cause an infinite lock.
-      const transaction = this.db!.transaction([STORE_FILES, STORE_MOUNTS], 'readwrite');
-      const fileStore = transaction.objectStore(STORE_FILES);
-
-      fileStore.put({ path: 'C:/Windows', name: 'Windows', type: 'dir', lastModified: Date.now() });
-      fileStore.put({ path: 'C:/Documents', name: 'Documents', type: 'dir', lastModified: Date.now() });
-      fileStore.put({
-        path: 'C:/readme.txt',
-        name: 'readme.txt',
-        type: 'file',
-        content: new Blob(
-          [
-            'Welcome to AmerOS!\n\nThis is your persistent Virtual File System.\nYou can also mount local folders to this OS using the File Explorer.',
-          ],
-          { type: 'text/plain' }
-        ),
+      const folderRecords: Record<string, any>[] = defaultVfs.folders.map((folderPath) => ({
+        path: folderPath,
+        name: folderPath.substring(folderPath.lastIndexOf('/') + 1),
+        type: 'dir',
         lastModified: Date.now(),
+      }));
+
+      const fileRecords = defaultVfs.files.map((file) => {
+        const binary = atob(file.contentBase64);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          array[i] = binary.charCodeAt(i);
+        }
+
+        return {
+          path: `C:/${file.relativePath}`,
+          name: file.name,
+          type: 'file',
+          lastModified: Date.now(),
+          content: new Blob([array], { type: file.contentType }),
+        };
       });
 
+      const transaction = this.db!.transaction([STORE_FILES, STORE_MOUNTS], 'readwrite');
+      const fileStore = transaction.objectStore(STORE_FILES);
       const mountStore = transaction.objectStore(STORE_MOUNTS);
-      mountStore.put({ letter: 'C', handle: null as any, label: 'AmerOS Boot' });
-      this.mounts['C'] = { letter: 'C', handle: null as any, label: 'AmerOS Boot' };
+
+      for (const record of [...folderRecords, ...fileRecords]) {
+        fileStore.put(record);
+      }
+
+      for (const mount of defaultVfs.mounts) {
+        mountStore.put(mount);
+        this.mounts[mount.letter] = mount as any;
+      }
 
       return new Promise<void>((resolve, reject) => {
         transaction.oncomplete = () => resolve();
@@ -685,6 +701,22 @@ class VFS {
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
+  }
+
+  async factoryReset() {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => console.warn('VFS factory reset blocked by open connections');
+    });
+
+    window.location.reload();
   }
 
   async getMounts() {

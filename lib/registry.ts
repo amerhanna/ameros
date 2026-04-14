@@ -1,6 +1,7 @@
 "use client"
 
 import { vfs } from "./vfs";
+import defaultRegistryHive from "./default-registry.json";
 
 /**
  * AmerOS Registry - System Configuration Store
@@ -303,13 +304,7 @@ class Registry {
   }
 
   private getDefaultHive(): RegistryNode[] {
-    return [
-      { name: 'HKEY_CLASSES_ROOT', type: 'key', content: [] },
-      { name: 'HKEY_CURRENT_USER', type: 'key', content: [] },
-      { name: 'HKEY_LOCAL_MACHINE', type: 'key', content: [] },
-      { name: 'HKEY_USERS', type: 'key', content: [] },
-      { name: 'HKEY_CURRENT_CONFIG', type: 'key', content: [] },
-    ];
+    return defaultRegistryHive as RegistryNode[];
   }
 
   /** Groundwork for Setup/Recovery: Wipes the system hive */

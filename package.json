@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "generate:vfs-defaults": "node scripts/generate-vfs-defaults.js",
+    "build": "pnpm run generate:vfs-defaults && next build",
+    "dev": "pnpm run generate:vfs-defaults && next dev",
     "lint": "npx tsc --noEmit && eslint .",
     "start": "next start"
   },
