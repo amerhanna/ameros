@@ -107,6 +107,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
       setWindowsState((prev) => {
         const newWindow: PersistentWindowState = {
           id,
+          appId: config.component,
           title: config.title || config.component,
           component: config.component,
           width: config.width || app?.width || 400,
@@ -201,6 +202,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
 
         const newWindow: PersistentWindowState = {
           id,
+          appId: `__child__${id}`,
           title: config.title,
           component: `__child__${id}`,
           width: config.width || 400,

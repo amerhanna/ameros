@@ -12,6 +12,7 @@ import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
 import InstallerApp from '@/Applications/Installer/InstallerApp';
 import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
+import Notes from '@/Applications/Notes/Notes';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -106,9 +107,17 @@ const applicationRegistry: ApplicationRegistry = {
     resizable: true,
     maximizable: true,
   },
+  Notes: {
+    component: Notes,
+    icon: "📝",
+    width: 400,
+    height: 500,
+    resizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
+  { label: 'Notes', component: 'Notes' },
   { label: 'Text Editor', component: 'TextEditor' },
   { label: 'Calculator', component: 'Calculator' },
   { label: 'File Explorer', component: 'FileExplorer' },
