@@ -12,6 +12,7 @@ import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
 import InstallerApp from '@/Applications/Installer/InstallerApp';
 import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
+import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
 import Notes from '@/Applications/Notes/Notes';
 import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
 
@@ -114,6 +115,14 @@ const applicationRegistry: ApplicationRegistry = {
     height: 500,
     resizable: true,
   },
+  DBExplorer: {
+    component: DBExplorer,
+    icon: '💽',
+    width: 900,
+    height: 600,
+    resizable: true,
+    maximizable: true,
+  },
 };
 
 const startMenuItems: StartMenuItem[] = [
@@ -133,6 +142,7 @@ const startMenuItems: StartMenuItem[] = [
     icon: '🧰',
     items: [
       { label: 'Registry Editor', component: 'Regedit' },
+      { label: 'Database Explorer', component: 'DBExplorer' },
       { label: 'App Installer', component: 'Installer' },
     ],
   },

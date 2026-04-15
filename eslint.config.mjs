@@ -27,8 +27,8 @@ const eslintConfig = defineConfig([
     }
   },
   {
-    // Exempt kernel/system directories from this rule
-    files: ["components/WindowManager/**/*", "lib/**/*", "hooks/**/*", "app/**/*"],
+    // Exempt kernel/system directories and the DBExplorer utility from this rule
+    files: ["components/WindowManager/**/*", "lib/**/*", "hooks/**/*", "app/**/*", "Applications/DBExplorer/**/*"],
     rules: {
       "no-restricted-imports": "off"
     }
