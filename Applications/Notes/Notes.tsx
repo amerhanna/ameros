@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDatabase } from '@/hooks/useDatabase';
+import { Trash2, Plus, RefreshCcw } from 'lucide-react';
 
 export default function Notes() {
   const { query, isReady, error } = useDatabase();
@@ -11,11 +12,21 @@ export default function Notes() {
   const loadNotes = async () => {
     if (!isReady) return;
     try {
-      await query('CREATE TABLE IF NOT EXISTS notes (id INT AUTO_INCREMENT, content STRING, createdAt STRING)');
+      await query('CREATE TABLE IF NOT EXISTS notes (id INT AUTOINCREMENT PRIMARY KEY, content STRING, createdAt STRING)');
       const res = await query('SELECT * FROM notes ORDER BY id DESC');
       setNotes(res || []);
     } catch (err) {
       console.error('Failed to load notes:', err);
+    }
+  };
+
+  const resetDatabase = async () => {
+    if (!confirm('This will delete all notes. Are you sure?')) return;
+    try {
+      await query('DROP TABLE notes');
+      await loadNotes();
+    } catch (err) {
+      console.error('Failed to reset notes:', err);
     }
   };
 
@@ -26,7 +37,7 @@ export default function Notes() {
   const addNote = async () => {
     if (!newNote.trim()) return;
     try {
-      await query('INSERT INTO notes (content, createdAt) VALUES (?, ?)', [newNote, newNote]);
+      await query('INSERT INTO notes (content, createdAt) VALUES (?, ?)', [newNote, new Date().toLocaleString()]);
       setNewNote('');
       await loadNotes();
     } catch (err) {
@@ -59,9 +70,16 @@ export default function Notes() {
         />
         <button
           onClick={addNote}
-          className="px-4 py-2 bg-blue-900 text-white border-b-2 border-blue-950 active:translate-y-0.5"
+          className="px-4 py-2 bg-blue-900 text-white border-b-2 border-blue-950 active:translate-y-0.5 flex items-center gap-2"
         >
-          Add
+          <Plus size={16} /> Add
+        </button>
+        <button
+          onClick={resetDatabase}
+          title="Reset Database"
+          className="px-4 py-2 bg-red-800 text-white border-b-2 border-red-950 active:translate-y-0.5 flex items-center justify-center"
+        >
+          <Trash2 size={16} />
         </button>
       </div>
 
@@ -72,7 +90,10 @@ export default function Notes() {
           <ul className="space-y-2">
             {notes.map((note) => (
               <li key={note.id} className="p-2 border-b border-gray-200 flex justify-between items-center group">
-                <span>{note.content}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-400 font-mono">ID: {note.id || 'N/A'}</span>
+                  <span>{note.content}</span>
+                </div>
                 <button
                   onClick={() => deleteNote(note.id)}
                   className="text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
