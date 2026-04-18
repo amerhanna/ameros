@@ -24,9 +24,6 @@ export default function SplashScreen({ onFinish, minDuration = 1500 }: SplashScr
           if (isMounted) setStatus(desc);
         });
 
-        // simulate error 50% of the time for testing
-        if (Math.random() < 0.5) throw new Error("Simulated boot failure for testing.");
-
         const elapsed = Date.now() - startTime;
         const remaining = minDuration - elapsed;
 
