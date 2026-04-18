@@ -150,6 +150,83 @@ class Registry {
     return await this.loadHiveFlat();
   }
 
+  /**
+   * Returns the names of all sub-keys directly under the specified path.
+   */
+  async getKeys(path: string): Promise<string[]> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const keyNode = this.findKeyNode(rawHive, path);
+    if (!keyNode) return [];
+    return keyNode.content
+      .filter((node): node is RegistryKeyNode => node.type === 'key')
+      .map((node) => node.name);
+  }
+
+  /**
+   * Returns all named values directly within the specified key path.
+   */
+  async getValues(path: string): Promise<Record<string, RegistryValue>> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const keyNode = this.findKeyNode(rawHive, path);
+    if (!keyNode) return {};
+
+    const values: Record<string, RegistryValue> = {};
+    for (const node of keyNode.content) {
+      if (node.type !== 'key') {
+        values[node.name] = node.content;
+      }
+    }
+    return values;
+  }
+
+  async deleteKey(path: string): Promise<void> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : "";
+    const keyName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+    
+    if (!parentPath) {
+      const index = rawHive.findIndex(n => n.type === 'key' && n.name === keyName);
+      if (index >= 0) {
+        rawHive.splice(index, 1);
+        await this.saveHiveRaw(rawHive);
+        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+      }
+      return;
+    }
+
+    const parentNode = this.findKeyNode(rawHive, parentPath);
+    if (parentNode) {
+      const index = parentNode.content.findIndex(n => n.type === 'key' && n.name === keyName);
+      if (index >= 0) {
+        parentNode.content.splice(index, 1);
+        await this.saveHiveRaw(rawHive);
+        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+      }
+    }
+  }
+
+  private findKeyNode(nodes: RegistryNode[], path: string): RegistryKeyNode | null {
+    if (!path) return null;
+    const parts = path.split('/');
+    let currentNodes = nodes;
+    let targetNode: RegistryKeyNode | null = null;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const found = currentNodes.find((n): n is RegistryKeyNode => n.type === 'key' && n.name === part);
+      if (!found) return null;
+      if (i === parts.length - 1) {
+        targetNode = found;
+      } else {
+        currentNodes = found.content;
+      }
+    }
+    return targetNode;
+  }
+
   private async loadHiveRaw(): Promise<RegistryNode[]> {
     try {
       if (!(await vfs.exists(this.HIVE_PATH))) return this.getDefaultHive();

@@ -73,3 +73,12 @@ export interface Application {
 }
 
 export type ApplicationRegistry = Record<string, Application>
+
+export interface InstalledApp {
+  id: string; // Internal key name (e.g. unique slug or hostname)
+  label: string;
+  type: 'website' | 'native' | 'system';
+  iconUrl?: string;
+  installDate: string;
+  launchArgs: Record<string, any>;
+}

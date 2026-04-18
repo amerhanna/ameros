@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { registry } from "@/lib/registry";
+import { appService } from "@/lib/app-service";
 import { setWindowsState } from "@/lib/window-store";
-import type { StartMenuItem } from "@/types/window";
+import type { StartMenuItem, InstalledApp } from "@/types/window";
 import Image from "next/image";
 
 function isValidHttpUrl(value: string): boolean {
@@ -48,36 +49,26 @@ function getFaviconUrl(urlString: string): string {
   }
 }
 
-type ExternalStartMenuItem = {
-  label: string;
-  component: string;
-  launchArgs: {
-    url: string;
-    title?: string;
-    iconUrl?: string;
-  };
-};
-
 export default function InstallerApp() {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [iconUrl, setIconUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [startMenuItems, setStartMenuItemsState] = useState<StartMenuItem[]>([]);
+  const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const items = await registry.get<StartMenuItem[]>('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', []);
-      if (mounted) setStartMenuItemsState(items);
+      const apps = await appService.listInstalledApps();
+      if (mounted) setInstalledApps(apps);
     }
     load();
 
     const handleUpdate = (e: CustomEvent) => {
-      if (e.detail.path === 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items') {
-         setStartMenuItemsState(e.detail.value as StartMenuItem[]);
+      if (e.detail.path.startsWith('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps')) {
+         load();
       }
     };
     window.addEventListener('reg-update', handleUpdate as EventListener);
@@ -86,12 +77,6 @@ export default function InstallerApp() {
       window.removeEventListener('reg-update', handleUpdate as EventListener);
     };
   }, []);
-
-  async function setStartMenuItems(updateFn: (prev: StartMenuItem[]) => StartMenuItem[]) {
-    const current = await registry.get<StartMenuItem[]>('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', []);
-    const next = updateFn(current);
-    await registry.set('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', next);
-  }
 
   const validUrl = isValidHttpUrl(url);
 
@@ -150,32 +135,20 @@ export default function InstallerApp() {
     };
   }, [url, validUrl]);
 
-  const getInstalledApps = (items: StartMenuItem[]): ExternalStartMenuItem[] => {
-    let apps: ExternalStartMenuItem[] = [];
-    for (const item of items) {
-      if ('component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url) {
-        apps.push(item as ExternalStartMenuItem);
-      }
-      if (item.type === 'submenu' && item.items) {
-        apps = apps.concat(getInstalledApps(item.items));
-      }
-    }
-    return apps;
-  };
-
-  const installedExternalApps = getInstalledApps(startMenuItems);
-
-  function installApp() {
+  async function installApp() {
     if (!validUrl) {
       setError("Please enter a valid HTTP/HTTPS URL.");
       return;
     }
 
     const externalLabel = title || new URL(url).hostname || url;
+    const appId = new URL(url).hostname; // Use hostname as ID for simplicity
 
-    const newItem: StartMenuItem = {
+    const appData: Omit<InstalledApp, 'installDate'> = {
+      id: appId,
       label: externalLabel,
-      component: 'WebApp',
+      type: 'website',
+      iconUrl: iconUrl,
       launchArgs: {
         url: new URL(url).toString(),
         title: externalLabel,
@@ -183,17 +156,13 @@ export default function InstallerApp() {
       },
     };
 
-    setStartMenuItems((prev) => {
-      const programsIndex = prev.findIndex((item) => item.type === 'submenu' && item.label === 'Programs');
-      if (programsIndex === -1) {
-        return [{ type: 'submenu', label: 'Programs', icon: '📂', items: [newItem] }, ...prev];
-      }
-      
-      const next = [...prev];
-      const programsMenu = { ...next[programsIndex] } as { type: 'submenu', label: string, items: StartMenuItem[], icon?: string, disabled?: boolean };
-      programsMenu.items = [...programsMenu.items, newItem];
-      next[programsIndex] = programsMenu;
-      return next;
+    await appService.installApp(appData);
+    
+    // Also add to start menu
+    await appService.addToStartMenu(appId, {
+      label: externalLabel,
+      component: 'WebApp',
+      launchArgs: appData.launchArgs
     });
 
     setUrl("");
@@ -202,19 +171,9 @@ export default function InstallerApp() {
     setError("");
   }
 
-  function uninstallApp(url: string) {
-    setStartMenuItems((prev) => {
-      return prev.map(item => {
-         if (item.type === 'submenu' && item.label === 'Programs') {
-            return {
-               ...item,
-               items: item.items.filter(subItem => !('component' in subItem && subItem.component === 'WebApp' && 'launchArgs' in subItem && subItem.launchArgs?.url === url))
-            };
-         }
-         return item;
-      }).filter(item => !('component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url === url));
-    });
-    setWindowsState((prev) => prev.filter((w) => !(w.component === 'WebApp' && w.launchArgs?.url === url)));
+  async function uninstallApp(appId: string, itemUrl: string) {
+    await appService.uninstallApp(appId);
+    setWindowsState((prev) => prev.filter((w) => !(w.component === 'WebApp' && w.launchArgs?.url === itemUrl)));
   }
 
   return (
@@ -275,18 +234,18 @@ export default function InstallerApp() {
         </CardFooter>
       </Card>
 
-      {installedExternalApps.length > 0 && (
+      {installedApps.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Installed External Apps</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {installedExternalApps.map((item) => (
-                <li key={item.component} className="flex items-center justify-between border rounded px-3 py-2">
+              {installedApps.map((item) => (
+                <li key={item.id} className="flex items-center justify-between border rounded px-3 py-2">
                   <div className="flex items-center gap-2">
                     <Image
-                      src={(item.launchArgs as any)?.iconUrl || "https://www.google.com/s2/favicons?domain=google.com"}
+                      src={item.iconUrl || "https://www.google.com/s2/favicons?domain=google.com"}
                       width={16}
                       height={16}
                       alt="icon"
@@ -294,7 +253,7 @@ export default function InstallerApp() {
                     />
                     <span>{item.label}</span>
                   </div>
-                  <Button variant="destructive" size="sm" onClick={() => uninstallApp(item.launchArgs.url)}>
+                  <Button variant="destructive" size="sm" onClick={() => uninstallApp(item.id, item.launchArgs.url)}>
                     Uninstall
                   </Button>
                 </li>

@@ -60,6 +60,11 @@
                     ]
                   }
                 ]
+              },
+              {
+                "name": "InstalledApps",
+                "type": "key",
+                "content": []
               }
             ]
           }
