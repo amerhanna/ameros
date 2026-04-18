@@ -3,6 +3,11 @@
 import { vfs } from "./vfs";
 import { registry } from "./registry";
 
+/**
+ * Defines the critical startup phases of AmerOS.
+ * Ensure tasks are slotted into the correct phase to maintain dependency resolution
+ * (e.g., Storage must boot before the Kernel reads settings).
+ */
 export enum BootStage {
   HARDWARE = 0,     // Low-level storage (IndexedDB)
   KERNEL = 1,       // Configuration engine (Registry)
@@ -11,6 +16,9 @@ export enum BootStage {
   SHELL = 4         // Final handover to UI
 }
 
+/**
+ * Represents a single atomic operation executed during system boot.
+ */
 export interface BootTask {
   id: string;
   stage: BootStage;
@@ -18,6 +26,10 @@ export interface BootTask {
   execute: () => Promise<void>;
 }
 
+/**
+ * Orchestrates the secure startup protocol for AmerOS.
+ * Processes `BootTask` items sequentially according to to their `BootStage` priority.
+ */
 class BootSequencer {
   private tasks: BootTask[] = [];
   public isBooted = false;
@@ -77,8 +89,12 @@ class BootSequencer {
   }
 
   /**
-   * Executes the boot pipeline sequentially.
-   * Catches stage failures to trigger Safe Mode / Factory Reset in the UI.
+   * Executes the full boot pipeline sequentially in priority order.
+   * Will throw safely if a critical component fails to boot, allowing UI layers
+   * to catch and trigger safe mode or recovery actions.
+   * 
+   * @param onProgress - Callback fired as the Sequencer begins executing each stage.
+   * @throws {Error} If any executed BootTask fails to resolve.
    */
   async executeBootSequence(onProgress: (desc: string) => void): Promise<void> {
     if (this.isBooted) return;

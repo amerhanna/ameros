@@ -14,6 +14,9 @@ import {
   updateWindow as updateWindowInStore,
 } from '@/lib/window-store';
 
+/**
+ * Configuration payload used when spawning attached popup/child windows from an existing generic application.
+ */
 export type WindowEngineChildConfig = {
   title: string;
   component: ComponentType<any>;
@@ -30,6 +33,13 @@ export type WindowEngineChildConfig = {
   launchArgs?: Record<string, any>;
 };
 
+/**
+ * The core logic loop orchestrating desktop windows inside AmerOS.
+ * Provides the context-agnostic array of `windows`, tracking their layout states, hierarchy, and 
+ * actions to manipulate them (open, close, focus, move).
+ *
+ * @param applicationRegistry Full suite of installed applications the OS is currently aware of.
+ */
 export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
   const [persistentWindows, setPersistentWindows] = useLocalStorage<PersistentWindowState[]>('ameros-windows', []);
   const [activeWindowId, setActiveWindowId] = useLocalStorage<string | null>('ameros-active-window', null);

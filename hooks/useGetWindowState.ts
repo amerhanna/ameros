@@ -13,6 +13,7 @@ function defaultEqual<T>(a: T, b: T): boolean {
 
 function ghostWindow(windowId: string): PersistentWindowState {
   return {
+    appId: '',
     id: windowId,
     title: '',
     component: '',
@@ -73,8 +74,26 @@ function useWindowStateById<T>(
 }
 
 /**
- * Read current window state from the external store.
+ * Read current window state from the external Zustand/Custom store synchronously.
+ * Allows components to reactively re-render when the Window's geometry or status changes.
  *
+ * The full `PersistentWindowState` shape returned natively maps:
+ * - `id`, `appId`, `title`, `component`: Core identity and registry routing paths.
+ * - `x`, `y`, `width`, `height`, `zIndex`: Active visual coordinate geometries.
+ * - `originalX`, `originalY`, `originalWidth`, `originalHeight`: Window boundaries prior to maximizing.
+ * - `isMinimized`, `isMaximized`: Layout status booleans.
+ * - `launchArgs`: Optional properties passed initially to the application entry.
+ * - `icon`, `resizable`, `minWidth`, `minHeight`, `maximizable`, `minimizable`: Strict view-constraints.
+ * - `modal`, `parentWindowId`, `childWindow`: Tree hierarchy identifiers for popups and dialogs.
+ *
+ * @example
+ * // Subscribes fully:
+ * const fullState = useGetWindowState();
+ * 
+ * @example
+ * // Subscribes to only specific fields to prevent over-rendering:
+ * const { isMaximized, width } = useGetWindowState(['isMaximized', 'width']);
+ * 
  * WARNING: Use this hook ONLY for components that must visually move or resize.
  * For buttons and logic, use `useWindowActions` instead.
  */

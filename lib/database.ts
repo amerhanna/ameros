@@ -2,6 +2,11 @@
 import alasql from 'alasql';
 import { vfs } from './vfs';
 
+/**
+ * OS Database Engine powered by AlaSQL.
+ * Provides a synchronous, in-memory SQL execution context that is automatically 
+ * serialized and synchronized to the Virtual File System (C:/System/AppData).
+ */
 class DatabaseService {
   private static instance: DatabaseService;
   private connectionPromises: Record<string, Promise<void>> = {};
@@ -15,6 +20,14 @@ class DatabaseService {
     return DatabaseService.instance;
   }
 
+  /**
+   * Initializes and connects to a localized database file within the given app's dataset.
+   * If the database does not exist in the VFS, it creates a fresh in-memory AlaSQL instance.
+   * Concurrent calls to connect identically resolve securely via `connectionPromises`.
+   *
+   * @param appName The unique ID of the application requesting connection (e.g., 'Notes').
+   * @param dbName Optional localized DB namespace, defaults to 'main'.
+   */
   public async connect(appName: string, dbName: string = 'main'): Promise<void> {
     const dbId = `${appName}_${dbName}`;
     
@@ -49,6 +62,17 @@ class DatabaseService {
     return this.connectionPromises[dbId];
   }
 
+  /**
+   * Safely executes an SQL query or mutation.
+   * Modifying queries (INSERT|UPDATE|DELETE etc.) are automatically captured and persist 
+   * exactly to the VFS to preserve state safely.
+   *
+   * @param appName Bound application context ID preventing cross-app data leakage.
+   * @param sql The raw SQL execution string.
+   * @param params Optional array of parameter bindings used over `?` syntax in AlaSQL.
+   * @param dbName Target database subset to execute upon.
+   * @returns Resolves with the executed execution result/rows.
+   */
   public async query(appName: string, sql: string, params: any[] = [], dbName: string = 'main'): Promise<any> {
     const dbId = `${appName}_${dbName}`;
     await this.connect(appName, dbName);

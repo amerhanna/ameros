@@ -7,6 +7,15 @@ import { SaveFileDialog } from "@/components/SystemDialogs/SaveFileDialog"
 import { FolderChooseDialog } from "@/components/SystemDialogs/FolderChooseDialog"
 import { type VFSNode } from "@/lib/vfs"
 
+/**
+ * Provides access to standard OS-level dialog windows (File Pickers, Folder Resolvers).
+ * These dialogs automatically spawn as modal child windows anchored to the active app.
+ * 
+ * @returns Object containing async dialog spawn methods:
+ * - `showOpenFileDialog`: Prompts user to select an existing file. Returns the absolute path or null.
+ * - `showSaveFileDialog`: Prompts user to choose a target destination path for saving. Returns path or null.
+ * - `showFolderChooseDialog`: Prompts user to select a directory path. Returns path or null.
+ */
 export function useSystemDialogs() {
   const { openChildWindow, getBounds } = useWindowActions()
 

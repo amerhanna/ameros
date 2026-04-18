@@ -11,12 +11,19 @@ import defaultRegistryHive from "./default-registry.json";
 export type RegistryValue = string | number | boolean | object | null;
 export type RegistryValueType = 'string' | 'number' | 'boolean' | 'object';
 
+/**
+ * Represents a hierarchical folder structure inside the Registry. 
+ * Can contain both child Keys or specific Values.
+ */
 export interface RegistryKeyNode {
   name: string;
   type: 'key';
   content: RegistryNode[];
 }
 
+/**
+ * Represents a leaf node holding tangible configuration data stored within a Registry Key.
+ */
 export interface RegistryValueNode {
   name: string;
   type: RegistryValueType;
@@ -27,6 +34,11 @@ export type RegistryNode = RegistryKeyNode | RegistryValueNode;
 
 
 
+/**
+ * AmerOS Global System Registry Core Engine.
+ * Responsible for mimicking traditional regedit hierarchical tracking to securely store 
+ * settings across booting sequences, UI preferences, and system states.
+ */
 class Registry {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
@@ -69,6 +81,13 @@ class Registry {
     return this.init();
   }
 
+  /**
+   * Retrieves a typed value securely from the Registry tree.
+   * If the requested path is not found, the fallback `defaultValue` is returned.
+   *
+   * @param path Full Registry path string (e.g. `HKEY_CURRENT_USER/Control Panel/Desktop`).
+   * @param defaultValue Graceful fallback if path is absent.
+   */
   async get<T>(path: string, defaultValue: T): Promise<T> {
     await this.ensureInitialized();
     try {
@@ -79,6 +98,13 @@ class Registry {
     }
   }
 
+  /**
+   * Sets a config value at the specified Registry Path and commits it securely to storage.
+   * Also broadcasts an active OS `reg-update` event so running applications dynamically update.
+   *
+   * @param path Full target key string path.
+   * @param value Setting assignment.
+   */
   async set(path: string, value: RegistryValue): Promise<void> {
     await this.ensureInitialized();
     const rawHive = await this.loadHiveRaw();

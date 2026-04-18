@@ -8,6 +8,9 @@ import defaultVfs from './vfs-defaults';
  * Supports recursive operations, cross-drive transfers (C: <=> D:), and volume labels.
  */
 
+/**
+ * Core structural model for all nodes existing within the VFS index.
+ */
 export interface BaseVFSNode {
   path: string;
   name: string;
@@ -57,6 +60,11 @@ const DB_VERSION = 2;
 const STORE_FILES = 'files';
 const STORE_MOUNTS = 'mounts';
 
+/**
+ * The Virtual File System API Engine.
+ * Transparently manages FileSystem Access API volume mounts alongside a persistent IDB storage fallback (`C:` drive).
+ * Provides node traversal, CRUD operations, permission negotiation, and observability.
+ */
 class VFS {
   private db: IDBDatabase | null = null;
   private mounts: Record<string, VFSMount> = {};
@@ -154,6 +162,10 @@ class VFS {
     }
   }
 
+  /**
+   * Checks if a specified path string completely resolves to a valid node within the VFS index.
+   * @param path Full path route (e.g., 'C:/Windows/System32')
+   */
   async exists(path: string): Promise<boolean> {
     await this.init();
     const node = await this.getNode(path);
@@ -183,6 +195,12 @@ class VFS {
     });
   }
 
+  /**
+   * Lists all node children existing at the requested directory.
+   * Automatically resolves root drives if requesting `/` or `C:`.
+   * @param path Folder path to read.
+   * @returns An array of resolved `VFSNode` structures.
+   */
   async ls(path: string): Promise<VFSNode[]> {
     await this.init();
     const normalizedPath = this.normalize(path);
@@ -324,6 +342,11 @@ class VFS {
     }
   }
 
+  /**
+   * Reads a file completely into memory.
+   * Resolves IDB nodes entirely into Blob/File references. Native mounts yield raw Native Handles.
+   * @param path Full filepath target.
+   */
   async readFile(path: string): Promise<string | ArrayBuffer | Blob | File> {
     await this.init();
     const node = await this.getNode(path);
@@ -341,6 +364,12 @@ class VFS {
     throw new Error('Not a file');
   }
 
+  /**
+   * Writes content forcefully into a file node at the designated path.
+   * Valid strings will be inherently converted to `'text/plain'` blobs.
+   * @param path Target filepath to write.
+   * @param content Raw data payload string, Buffer, or Blob.
+   */
   async writeFile(path: string, content: string | ArrayBuffer | Blob | File) {
     await this.init();
     const normalizedPath = this.normalize(path);
@@ -394,6 +423,10 @@ class VFS {
     await writable.close();
   }
 
+  /**
+   * Forces the creation of a Folder Directory strictly.
+   * @param path The full desired path for the new folder.
+   */
   async mkdir(path: string) {
     await this.init();
     const normalizedPath = this.normalize(path);
@@ -437,6 +470,11 @@ class VFS {
     }
   }
 
+  /**
+   * Scans and fully deletes a node and all of its nested children automatically.
+   * Recursive behavior is executed if the targeted path is verified as a Directory.
+   * @param path Path string mapping the desired entity to erase.
+   */
   async delete(path: string) {
     await this.init();
     const normalizedPath = this.normalize(path);
@@ -487,6 +525,11 @@ class VFS {
     await (currentHandle as any).removeEntry(name, { recursive: true });
   }
 
+  /**
+   * Reassigns the name identity of a specific target node or folder.
+   * @param path Target path pointing to the entity.
+   * @param newName Flat filename target mapping (Does not execute directory migration).
+   */
   async rename(path: string, newName: string) {
     await this.init();
     const normalizedPath = this.normalize(path);
@@ -555,6 +598,12 @@ class VFS {
     });
   }
 
+  /**
+   * Recursively copies a target entity and all its nested branches effectively to a new path.
+   * IDB instances and Native handles resolve correctly between memory barriers.
+   * @param src Target Path mapping the identity to clone.
+   * @param dest The resulting absolute Path boundary structure containing exactly where it drops.
+   */
   async copy(src: string, dest: string) {
     await this.init();
     const srcNode = await this.getNode(src);
@@ -573,6 +622,10 @@ class VFS {
     await this.writeFile(dest, content);
   }
 
+  /**
+   * Copies the targeted Source completely to the given Dest and then permanently erases the original instance cleanly.
+   * Optimizes internally yielding Native `move` APIs when transferring directly within equivalent external File System mounted letters.
+   */
   async move(src: string, dest: string) {
     await this.init();
     const srcDrive = src.split(':')[0];
@@ -598,6 +651,9 @@ class VFS {
     await this.delete(src);
   }
 
+  /**
+   * Traverses a path and safely recursively calculates byte size weights for files or huge folder structures.
+   */
   async getSize(path: string): Promise<number> {
     await this.init();
     const node = await this.getNode(path);
@@ -621,6 +677,10 @@ class VFS {
     return total;
   }
 
+  /**
+   * Fetches advanced security layout and byte structure characteristics of a path.
+   * Also negotiates read/write permission statuses.
+   */
   async getProperties(path: string): Promise<VFSProperties> {
     await this.init();
     const node = await this.getNode(path);
@@ -666,6 +726,10 @@ class VFS {
     return this.mounts[letter]?.label || (letter === 'C' ? 'Local Disk' : 'Removable Disk');
   }
 
+  /**
+   * Creates a dedicated external memory Volume mapped exactly natively over a user chosen File System Access OS Handle.
+   * Assigns sequential distinct drive mapping assignments (D:, E:, F:, G:, etc.) automatically natively.
+   */
   async mountFolder(handle: FileSystemDirectoryHandle): Promise<string> {
     await this.init();
     const letters = 'DEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -687,6 +751,10 @@ class VFS {
     });
   }
 
+  /**
+   * Destroys an existing mounted external hardware connection dropping its state explicitly.
+   * System effectively blocks the 'C' internal letter dynamically explicitly.
+   */
   async unmountFolder(letter: string): Promise<void> {
     await this.init();
     if (letter === 'C') throw new Error('Cannot unmount boot drive');
@@ -815,4 +883,8 @@ class VFS {
   }
 }
 
+/**
+ * System-wide Singleton instance of the Virtual File System.
+ * Expected to be `.init()`'d specifically during the Hardware sequence in `boot-sequencer.ts`.
+ */
 export const vfs = new VFS();

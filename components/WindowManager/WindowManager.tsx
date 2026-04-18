@@ -14,12 +14,19 @@ import { useWindowEngine } from "@/hooks/useWindowEngine";
 import { useStartMenu } from "@/hooks/useStartMenu";
 import { useDesktopContextMenu } from "@/hooks/useDesktopContextMenu";
 
+/** Core props configuring the base desktop shell environment. */
 interface WindowManagerProps {
   children?: React.ReactNode;
   applicationRegistry?: ApplicationRegistry;
   startMenuItems?: StartMenuItem[];
 }
 
+/**
+ * The core graphical Shell for AmerOS.
+ * This component acts as the desktop background and manages rendering all floating application
+ * Windows, the global transparent Context menus, the Taskbar, and the Start Menu.
+ * Handles the splash screen mounting logic sequence globally.
+ */
 export default function WindowManager({ children, applicationRegistry = {}, startMenuItems = [] }: WindowManagerProps) {
   const {
     mounted,

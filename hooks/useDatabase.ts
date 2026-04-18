@@ -4,6 +4,16 @@ import { useState, useEffect, useCallback, useContext } from 'react';
 import { dbService } from '@/lib/database';
 import { WindowContext } from '@/components/WindowManager/WindowContext';
 
+/**
+ * Resolves the OS active Database context isolated to the calling application.
+ * Ensures strict security by rejecting non-window callers (prevents cross-app spoofing or global leakages).
+ * 
+ * @param dbName Optional localized namespace for the database (defaults to 'main').
+ * @returns Object providing:
+ * - `query(sql, params)`: Async function to execute AlaSQL statements. Mutations auto-sync to VFS.
+ * - `isReady`: Boolean flag if the DB connection is fully established.
+ * - `error`: Rejection string or null if successful.
+ */
 export function useDatabase(dbName: string = 'main') {
   const windowContext = useContext(WindowContext);
   

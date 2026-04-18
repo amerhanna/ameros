@@ -134,6 +134,15 @@ function InputBoxContent({ message, onResolve }: InputBoxProps) {
   );
 }
 
+/**
+ * Provides access to standard OS-level alert and input boxes.
+ * These dialogs map directly to standard system alerts and block interaction with the parent window
+ * if `isModal` is set to true.
+ *
+ * @returns Object containing popup methods:
+ * - `showMessageBox(title, message, isModal?, buttons?)`: Displays a Win32-style alert box. Resolves to the string of the clicked button (e.g. 'OK', 'Cancel') or null if dismissed.
+ * - `showInputBox(title, message, isModal?)`: Displays a text input prompt. Resolves to the user's typed string or null if dismissed/cancelled.
+ */
 export function useMessageBox() {
   const { openChildWindow, getBounds } = useWindowActions();
 
