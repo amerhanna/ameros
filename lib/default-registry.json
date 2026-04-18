@@ -1,0 +1,27 @@
+[
+  {
+    "name": "HKEY_CLASSES_ROOT",
+    "type": "key",
+    "content": []
+  },
+  {
+    "name": "HKEY_CURRENT_USER",
+    "type": "key",
+    "content": []
+  },
+  {
+    "name": "HKEY_LOCAL_MACHINE",
+    "type": "key",
+    "content": []
+  },
+  {
+    "name": "HKEY_USERS",
+    "type": "key",
+    "content": []
+  },
+  {
+    "name": "HKEY_CURRENT_CONFIG",
+    "type": "key",
+    "content": []
+  }
+]
