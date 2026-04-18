@@ -21,6 +21,23 @@ class DatabaseService {
   }
 
   /**
+   * Initializes the database service by ensuring root structural directories exist
+   * within the Virtual File System for application data persistence.
+   */
+  public async init(): Promise<void> {
+    const sysDir = 'C:/System';
+    const appDataDir = 'C:/System/AppData';
+
+    if (!(await vfs.exists(sysDir))) {
+      await vfs.mkdir(sysDir);
+    }
+    if (!(await vfs.exists(appDataDir))) {
+      await vfs.mkdir(appDataDir);
+    }
+    DatabaseService.getInstance();
+  }
+
+  /**
    * Initializes and connects to a localized database file within the given app's dataset.
    * If the database does not exist in the VFS, it creates a fresh in-memory AlaSQL instance.
    * Concurrent calls to connect identically resolve securely via `connectionPromises`.

@@ -2,6 +2,7 @@
 
 import { vfs } from "./vfs";
 import { registry } from "./registry";
+import { dbService } from "./database";
 
 /**
  * Defines the critical startup phases of AmerOS.
@@ -64,6 +65,15 @@ class BootSequencer {
       description: "Loading System Registry...",
       execute: async () => {
         await registry.init();
+      },
+    });
+
+    this.registerTask({
+      id: "database-init",
+      stage: BootStage.SERVICES,
+      description: "Starting Database Engine...",
+      execute: async () => {
+        await dbService.init();
       },
     });
 
