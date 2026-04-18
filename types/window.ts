@@ -45,6 +45,7 @@ export type StartMenuItem = {
 
 export interface PersistentWindowState extends WindowConfig {
   id: string
+  appId: string
   zIndex: number
   // Store original dimensions for restore
   originalWidth: number
@@ -55,6 +56,7 @@ export interface PersistentWindowState extends WindowConfig {
 
 export interface WindowState extends Omit<PersistentWindowState, "component"> {
   component: React.ComponentType<any>
+  appId: string
 }
 
 export interface Application {

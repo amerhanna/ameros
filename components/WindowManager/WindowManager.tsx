@@ -59,6 +59,7 @@ export default function WindowManager({ children, applicationRegistry = {}, star
             <Window
               key={window.id}
               id={window.id}
+              appId={window.appId}
               title={window.title}
               icon={window.icon}
               isActive={effectiveActiveWindowId === window.id}

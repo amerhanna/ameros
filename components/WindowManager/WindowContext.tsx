@@ -29,6 +29,8 @@ export interface WindowContextType {
   resize: (e?: React.MouseEvent | React.TouchEvent, width?: number, height?: number, x?: number, y?: number) => void;
   close: () => void;
   id: string;
+  /** Unique name of the application (from registry key) */
+  appId: string;
   /** Live frame from the DOM (matches drag/resize; x/y may differ from props until React state catches up) */
   getBounds: () => { x: number; y: number; width: number; height: number };
   launchArgs?: Record<string, any>;

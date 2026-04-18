@@ -12,6 +12,7 @@ import MenuBar from './MenuBar';
 
 interface WindowProps {
   id: string;
+  appId: string;
   title?: string;
   icon?: string;
   isActive?: boolean;
@@ -37,6 +38,7 @@ interface WindowProps {
 
 export default function Window({
   id,
+  appId,
   title = 'Untitled',
   icon = '📁',
   isActive = false,
@@ -178,6 +180,7 @@ export default function Window({
   const windowContextValue = useMemo(
     () => ({
       id,
+      appId,
       getBounds,
       maximize: maximizeWindow,
       minimize: minimizeWindow,
@@ -194,7 +197,7 @@ export default function Window({
         return openChildWindow?.(config) ?? null;
       },
     }),
-    [id, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow],
+    [id, appId, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow],
   );
 
   useEffect(() => {
