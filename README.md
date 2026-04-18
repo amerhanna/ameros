@@ -1,11 +1,11 @@
 # AmerOS
 
-AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), and a suite of "Applications".
+AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-03-31.after-017a7f1.add-clipboard-context-and-integrate-into-explorer
-> Baseline Commit: 017a7f1
-> Baseline Summary: Add clipboard context and integrate into explorer
-> Generated At (UTC): 2026-03-31T19:16:20Z
+> Doc Version: 2026-04-18.after-02bcc30.merge-pull-request-8-from-amerhanna-database-service
+> Baseline Commit: 02bcc30
+> Baseline Summary: Merge pull request #8 from amerhanna/database-service
+> Generated At (UTC): 2026-04-18T10:18:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation
@@ -20,7 +20,8 @@ AmerOS is a React-based (Next.js) web application that simulates a desktop opera
 
 ## Built With
 - **Next.js**: Framework for building the OS.
-- **Tailwind CSS**: Styling.
+- **Tailwind CSS**: Styling and layout.
+- **Radix UI** / **Shadcn UI**: Accessible components primitives.
 - **Lucide React**: Icons.
-- **Zustand**: State management for windows and OS settings.
-- **IndexedDB**: Persistent storage for the VFS.
+- **AlaSQL**: Application-bound relational database layer.
+- **IndexedDB**: Persistent storage for the Virtual File System.
