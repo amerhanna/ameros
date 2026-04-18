@@ -33,7 +33,7 @@ export type StartMenuItem = {
 } | {
   label: string
   icon: string
-  action: () => void
+  actionId: string
   type: "action"
 } | {
   type: "submenu"

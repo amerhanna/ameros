@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { registry } from "@/lib/registry";
 import { setWindowsState } from "@/lib/window-store";
 import type { StartMenuItem } from "@/types/window";
 import Image from "next/image";
@@ -64,8 +64,34 @@ export default function InstallerApp() {
   const [iconUrl, setIconUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [startMenuItems, setStartMenuItems] = useLocalStorage<StartMenuItem[]>("ameros-installed-apps", []);
+  const [startMenuItems, setStartMenuItemsState] = useState<StartMenuItem[]>([]);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const items = await registry.get<StartMenuItem[]>('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', []);
+      if (mounted) setStartMenuItemsState(items);
+    }
+    load();
+
+    const handleUpdate = (e: CustomEvent) => {
+      if (e.detail.path === 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items') {
+         setStartMenuItemsState(e.detail.value as StartMenuItem[]);
+      }
+    };
+    window.addEventListener('reg-update', handleUpdate as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('reg-update', handleUpdate as EventListener);
+    };
+  }, []);
+
+  async function setStartMenuItems(updateFn: (prev: StartMenuItem[]) => StartMenuItem[]) {
+    const current = await registry.get<StartMenuItem[]>('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', []);
+    const next = updateFn(current);
+    await registry.set('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items', next);
+  }
 
   const validUrl = isValidHttpUrl(url);
 
@@ -124,10 +150,20 @@ export default function InstallerApp() {
     };
   }, [url, validUrl]);
 
-  const installedExternalApps = startMenuItems.filter(
-    (item): item is ExternalStartMenuItem =>
-      'component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url,
-  );
+  const getInstalledApps = (items: StartMenuItem[]): ExternalStartMenuItem[] => {
+    let apps: ExternalStartMenuItem[] = [];
+    for (const item of items) {
+      if ('component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url) {
+        apps.push(item as ExternalStartMenuItem);
+      }
+      if (item.type === 'submenu' && item.items) {
+        apps = apps.concat(getInstalledApps(item.items));
+      }
+    }
+    return apps;
+  };
+
+  const installedExternalApps = getInstalledApps(startMenuItems);
 
   function installApp() {
     if (!validUrl) {
@@ -147,7 +183,18 @@ export default function InstallerApp() {
       },
     };
 
-    setStartMenuItems((prev) => [...prev, newItem]);
+    setStartMenuItems((prev) => {
+      const programsIndex = prev.findIndex((item) => item.type === 'submenu' && item.label === 'Programs');
+      if (programsIndex === -1) {
+        return [{ type: 'submenu', label: 'Programs', icon: '📂', items: [newItem] }, ...prev];
+      }
+      
+      const next = [...prev];
+      const programsMenu = { ...next[programsIndex] } as { type: 'submenu', label: string, items: StartMenuItem[], icon?: string, disabled?: boolean };
+      programsMenu.items = [...programsMenu.items, newItem];
+      next[programsIndex] = programsMenu;
+      return next;
+    });
 
     setUrl("");
     setTitle("");
@@ -156,10 +203,18 @@ export default function InstallerApp() {
   }
 
   function uninstallApp(url: string) {
-    setStartMenuItems((prev) =>
-      prev.filter((item) => !('component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url === url)),
-    );
-    setWindowsState((prev) => prev.filter((w) => w.component === 'WebApp' && w.launchArgs?.url === url));
+    setStartMenuItems((prev) => {
+      return prev.map(item => {
+         if (item.type === 'submenu' && item.label === 'Programs') {
+            return {
+               ...item,
+               items: item.items.filter(subItem => !('component' in subItem && subItem.component === 'WebApp' && 'launchArgs' in subItem && subItem.launchArgs?.url === url))
+            };
+         }
+         return item;
+      }).filter(item => !('component' in item && item.component === 'WebApp' && 'launchArgs' in item && item.launchArgs?.url === url));
+    });
+    setWindowsState((prev) => prev.filter((w) => !(w.component === 'WebApp' && w.launchArgs?.url === url)));
   }
 
   return (

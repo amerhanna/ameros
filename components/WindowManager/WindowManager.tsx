@@ -18,7 +18,6 @@ import { useDesktopContextMenu } from "@/hooks/useDesktopContextMenu";
 interface WindowManagerProps {
   children?: React.ReactNode;
   applicationRegistry?: ApplicationRegistry;
-  startMenuItems?: StartMenuItem[];
 }
 
 /**
@@ -27,7 +26,7 @@ interface WindowManagerProps {
  * Windows, the global transparent Context menus, the Taskbar, and the Start Menu.
  * Handles the splash screen mounting logic sequence globally.
  */
-export default function WindowManager({ children, applicationRegistry = {}, startMenuItems = [] }: WindowManagerProps) {
+export default function WindowManager({ children, applicationRegistry = {} }: WindowManagerProps) {
   const {
     mounted,
     windows,
@@ -47,7 +46,7 @@ export default function WindowManager({ children, applicationRegistry = {}, star
     blockedWindowIds,
   } = useWindowEngine(applicationRegistry);
 
-  const { combinedStartMenuItems, isStartMenuOpen, toggleStartMenu, closeStartMenu } = useStartMenu(startMenuItems);
+  const { combinedStartMenuItems, isStartMenuOpen, toggleStartMenu, closeStartMenu } = useStartMenu();
 
   const { contextMenu, openWindowMenu, closeWindowMenu } = useDesktopContextMenu();
 
