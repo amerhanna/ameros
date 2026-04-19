@@ -875,6 +875,135 @@ class VFS {
     }
   }
 
+  /**
+   * Exports all files on C: drive as a ZIP blob, excluding specified paths.
+   * Uses @zip.js/zip.js for browser-native ZIP creation.
+   */
+  async exportStorage(excludePaths: string[] = []): Promise<Blob> {
+    await this.init();
+    const { BlobWriter, ZipWriter } = await import('@zip.js/zip.js');
+
+    const normalizedExcludes = excludePaths.map((p) => this.normalize(p));
+    const allNodes = await this.getAllIDBNodes();
+
+    const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+
+    for (const node of allNodes) {
+      // Skip excluded paths
+      if (normalizedExcludes.some((ep) => node.path === ep || node.path.startsWith(ep + '/'))) {
+        continue;
+      }
+
+      // Only export C: drive internal files
+      if (!node.path.startsWith('C:')) continue;
+
+      // Strip the C:/ prefix for the zip entry name
+      const entryName = node.path.slice(3); // removes "C:/"
+
+      if (node.type === 'dir') {
+        await zipWriter.add(entryName + '/', new (await import('@zip.js/zip.js')).BlobReader(new Blob([])), { directory: true });
+      } else if (node.type === 'file') {
+        let blob: Blob;
+        if (node.content instanceof Blob || node.content instanceof File) {
+          blob = node.content;
+        } else if (node.content instanceof ArrayBuffer) {
+          blob = new Blob([node.content]);
+        } else if (typeof node.content === 'string') {
+          blob = new Blob([node.content], { type: 'text/plain' });
+        } else {
+          blob = new Blob([]);
+        }
+        await zipWriter.add(entryName, new (await import('@zip.js/zip.js')).BlobReader(blob));
+      }
+    }
+
+    return await zipWriter.close();
+  }
+
+  /**
+   * Imports storage from a ZIP blob, writing entries as files/dirs into C: drive IDB.
+   */
+  async importStorage(zipBlob: Blob): Promise<void> {
+    await this.init();
+    const { BlobReader, ZipReader } = await import('@zip.js/zip.js');
+
+    const zipReader = new ZipReader(new BlobReader(zipBlob));
+    const entries = await zipReader.getEntries();
+
+    for (const entry of entries) {
+      const fullPath = 'C:/' + entry.filename.replace(/\/$/, '');
+      if (!fullPath || fullPath === 'C:') continue;
+
+      if (entry.directory) {
+        await this.mkdir(fullPath);
+      } else {
+        // Ensure parent dir exists
+        const parentPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+        if (parentPath && parentPath !== 'C:') {
+          const parentExists = await this.exists(parentPath);
+          if (!parentExists) await this.mkdir(parentPath);
+        }
+
+        if (entry.getData) {
+          const { BlobWriter } = await import('@zip.js/zip.js');
+          const blob = await entry.getData(new BlobWriter());
+          await this.writeFile(fullPath, blob);
+        }
+      }
+    }
+
+    await zipReader.close();
+  }
+
+  /**
+   * Clears all files on C: drive except excluded paths.
+   * Does NOT delete the IDB database or mounts—only file entries.
+   */
+  async clearStorage(excludePaths: string[] = []): Promise<void> {
+    await this.init();
+    const normalizedExcludes = excludePaths.map((p) => this.normalize(p));
+
+    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
+    const store = transaction.objectStore(STORE_FILES);
+    const request = store.openCursor();
+
+    return new Promise<void>((resolve, reject) => {
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          const nodePath: string = cursor.value.path;
+          // Only clear C: drive entries
+          if (nodePath.startsWith('C:')) {
+            const isExcluded = normalizedExcludes.some(
+              (ep) => nodePath === ep || nodePath.startsWith(ep + '/')
+            );
+            if (!isExcluded) {
+              cursor.delete();
+            }
+          }
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
+   * Returns all raw IDB node records for the files store.
+   */
+  private async getAllIDBNodes(): Promise<any[]> {
+    const transaction = this.db!.transaction(STORE_FILES, 'readonly');
+    const store = transaction.objectStore(STORE_FILES);
+    const request = store.getAll();
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   private normalize(path: string): string {
     let p = path.replace(/\\/g, '/');
     if (p.endsWith('/') && p.length > 3) p = p.slice(0, -1);
