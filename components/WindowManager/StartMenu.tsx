@@ -24,7 +24,11 @@ function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps[
         type: "item",
         label: item.label,
         icon: item.icon,
-        action: item.action,
+        action: () => {
+          if (item.actionId === 'shutdown') {
+            console.log('Shut down clicked');
+          }
+        },
       }
     }
 

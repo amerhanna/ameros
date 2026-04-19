@@ -150,6 +150,91 @@ class Registry {
     return await this.loadHiveFlat();
   }
 
+  /**
+   * Returns the names of all sub-keys directly under the specified path.
+   */
+  async getKeys(path: string): Promise<string[]> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const keyNode = this.findKeyNode(rawHive, path);
+    if (!keyNode) return [];
+    return keyNode.content
+      .filter((node): node is RegistryKeyNode => node.type === 'key')
+      .map((node) => node.name);
+  }
+
+  /**
+   * Returns all named values directly within the specified key path.
+   */
+  async getValues(path: string): Promise<Record<string, RegistryValue>> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const keyNode = this.findKeyNode(rawHive, path);
+    if (!keyNode) return {};
+
+    const values: Record<string, RegistryValue> = {};
+    for (const node of keyNode.content) {
+      if (node.type !== 'key') {
+        values[node.name] = node.content;
+      }
+    }
+    return values;
+  }
+
+  async deleteKey(path: string): Promise<void> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : "";
+    const keyName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+    
+    if (!parentPath) {
+      const index = rawHive.findIndex(n => n.type === 'key' && n.name === keyName);
+      if (index >= 0) {
+        rawHive.splice(index, 1);
+        await this.saveHiveRaw(rawHive);
+        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+      }
+      return;
+    }
+
+    const parentNode = this.findKeyNode(rawHive, parentPath);
+    if (parentNode) {
+      const index = parentNode.content.findIndex(n => n.type === 'key' && n.name === keyName);
+      if (index >= 0) {
+        parentNode.content.splice(index, 1);
+        await this.saveHiveRaw(rawHive);
+        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+      }
+    }
+  }
+
+  private normalizePath(path: string): string {
+    return path.replace(/\/+$/, '').trim();
+  }
+
+  private findKeyNode(nodes: RegistryNode[], path: string): RegistryKeyNode | null {
+    const normalized = this.normalizePath(path);
+    if (!normalized) return null;
+
+    const parts = normalized.split('/');
+    let currentNodes = nodes;
+    let targetNode: RegistryKeyNode | null = null;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].toLowerCase();
+      const found = currentNodes.find((n): n is RegistryKeyNode => 
+        n.type === 'key' && n.name.toLowerCase() === part
+      );
+      if (!found) return null;
+      if (i === parts.length - 1) {
+        targetNode = found;
+      } else {
+        currentNodes = found.content;
+      }
+    }
+    return targetNode;
+  }
+
   private async loadHiveRaw(): Promise<RegistryNode[]> {
     try {
       if (!(await vfs.exists(this.HIVE_PATH))) return this.getDefaultHive();
@@ -204,17 +289,49 @@ class Registry {
   }
 
   private setValueNode(nodes: RegistryNode[], path: string, value: RegistryValue): void {
-    const keyPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : path;
-    const valueName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : 'default';
+    const normalized = this.normalizePath(path);
+
+    // 1. If the path matches an existing key, we target its (Default) value
+    if (this.findKeyNode(nodes, normalized)) {
+      const keyNode = this.ensureKeyNode(nodes, normalized);
+      this.setNamedValue(keyNode, 'default', value);
+
+      // 2. Cleanup: If a "shadow" value with the same name exists in the parent key, remote it
+      if (normalized.includes('/')) {
+        const lastSlashIndex = normalized.lastIndexOf('/');
+        const parentPath = normalized.slice(0, lastSlashIndex);
+        const keyName = normalized.slice(lastSlashIndex + 1);
+        
+        const parentNode = this.findKeyNode(nodes, parentPath);
+        if (parentNode) {
+          const shadowIndex = parentNode.content.findIndex(
+            (n): n is RegistryValueNode => n.type !== 'key' && n.name.toLowerCase() === keyName.toLowerCase()
+          );
+          if (shadowIndex >= 0) {
+            parentNode.content.splice(shadowIndex, 1);
+          }
+        }
+      }
+      return;
+    }
+
+    // 2. Otherwise, split the path into the parent key and the value name
+    const keyPath = normalized.includes('/') ? normalized.slice(0, normalized.lastIndexOf('/')) : '';
+    const valueName = normalized.includes('/') ? normalized.slice(normalized.lastIndexOf('/') + 1) : normalized;
+    
     const keyNode = this.ensureKeyNode(nodes, keyPath);
+    this.setNamedValue(keyNode, valueName, value);
+  }
+
+  private setNamedValue(keyNode: RegistryKeyNode, name: string, value: RegistryValue): void {
     const valueNode: RegistryValueNode = {
-      name: valueName,
+      name,
       type: this.getValueType(value),
       content: value,
     };
 
     const existingIndex = keyNode.content.findIndex(
-      (child): child is RegistryValueNode => child.type !== 'key' && child.name === valueName
+      (child): child is RegistryValueNode => child.type !== 'key' && child.name.toLowerCase() === name.toLowerCase()
     );
 
     if (existingIndex >= 0) {
@@ -225,13 +342,14 @@ class Registry {
   }
 
   private ensureKeyNode(nodes: RegistryNode[], path: string): RegistryKeyNode {
+    const normalized = this.normalizePath(path);
     const keyMap = new Map<string, RegistryKeyNode>();
 
     const buildIndex = (currentNodes: RegistryNode[], currentPath = "") => {
       for (const node of currentNodes) {
         if (node.type === 'key') {
           const fullPath = currentPath ? `${currentPath}/${node.name}` : node.name;
-          keyMap.set(fullPath, node);
+          keyMap.set(fullPath.toLowerCase(), node);
           buildIndex(node.content, fullPath);
         }
       }
@@ -240,13 +358,14 @@ class Registry {
     buildIndex(nodes);
 
     const createOrGet = (fullPath: string): RegistryKeyNode => {
-      if (keyMap.has(fullPath)) {
-        return keyMap.get(fullPath)!;
+      const lowerPath = fullPath.toLowerCase();
+      if (keyMap.has(lowerPath)) {
+        return keyMap.get(lowerPath)!;
       }
 
       const name = fullPath.split('/').pop() ?? fullPath;
       const newNode: RegistryKeyNode = { name, type: 'key', content: [] };
-      keyMap.set(fullPath, newNode);
+      keyMap.set(lowerPath, newNode);
 
       if (fullPath.includes('/')) {
         const parentPath = fullPath.slice(0, fullPath.lastIndexOf('/'));
@@ -259,7 +378,7 @@ class Registry {
       return newNode;
     };
 
-    return createOrGet(path);
+    return createOrGet(normalized);
   }
 
   private migrateLegacyHive(hive: Record<string, RegistryValue>): RegistryNode[] {

@@ -14,7 +14,7 @@ import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
 import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
 import Notes from '@/Applications/Notes/Notes';
-import type { StartMenuItem, ApplicationRegistry } from '@/types/window';
+import type { ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
   TextEditor: {
@@ -125,43 +125,10 @@ const applicationRegistry: ApplicationRegistry = {
   },
 };
 
-const startMenuItems: StartMenuItem[] = [
-  { label: 'Notes', component: 'Notes' },
-  { label: 'Text Editor', component: 'TextEditor' },
-  { label: 'Calculator', component: 'Calculator' },
-  { label: 'File Explorer', component: 'FileExplorer' },
-  { label: 'Demo Application', component: 'DemoApp' },
-  { label: 'Common Dialog Demo', component: 'CommonDialogDemo' },
-  { label: 'History Explorer', component: 'DeepSeekHistory' },
-  { label: 'Test Close', component: 'TestCloseApp' },
-  { type: 'separator' },
-  { label: 'Settings', component: 'Settings' },
-  {
-    type: 'submenu',
-    label: 'Utilities',
-    icon: '🧰',
-    items: [
-      { label: 'Registry Editor', component: 'Regedit' },
-      { label: 'Database Explorer', component: 'DBExplorer' },
-      { label: 'App Installer', component: 'Installer' },
-    ],
-  },
-  { type: 'separator' },
-  {
-    icon: '🔌',
-    label: 'Shut Down...',
-    action: () => {
-      console.log('Shut down clicked');
-    },
-    type: 'action',
-  },
-];
-
 export default function WindowManagerDemo() {
   return (
     <WindowManager 
       applicationRegistry={applicationRegistry} 
-      startMenuItems={startMenuItems} 
     />
   );
 }

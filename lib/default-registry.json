@@ -12,7 +12,162 @@
   {
     "name": "HKEY_LOCAL_MACHINE",
     "type": "key",
-    "content": []
+    "content": [
+      {
+        "name": "SOFTWARE",
+        "type": "key",
+        "content": [
+          {
+            "name": "AmerOS",
+            "type": "key",
+            "content": [
+              {
+                "name": "StartMenu",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "default",
+                    "type": "object",
+                    "content": ["Programs", "Notes", "TextEditor", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "DeepSeekHistory", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                  },
+                  {
+                    "name": "Programs",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Programs" },
+                      { "name": "type", "type": "string", "content": "submenu" },
+                      { "name": "icon", "type": "string", "content": "📂" },
+                      { "name": "default", "type": "object", "content": [] }
+                    ]
+                  },
+                  {
+                    "name": "Notes",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Notes" },
+                      { "name": "component", "type": "string", "content": "Notes" }
+                    ]
+                  },
+                  {
+                    "name": "TextEditor",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Text Editor" },
+                      { "name": "component", "type": "string", "content": "TextEditor" }
+                    ]
+                  },
+                  {
+                    "name": "Calculator",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Calculator" },
+                      { "name": "component", "type": "string", "content": "Calculator" }
+                    ]
+                  },
+                  {
+                    "name": "FileExplorer",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "File Explorer" },
+                      { "name": "component", "type": "string", "content": "FileExplorer" }
+                    ]
+                  },
+                  {
+                    "name": "DemoApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Demo Application" },
+                      { "name": "component", "type": "string", "content": "DemoApp" }
+                    ]
+                  },
+                  {
+                    "name": "CommonDialogDemo",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Common Dialog Demo" },
+                      { "name": "component", "type": "string", "content": "CommonDialogDemo" }
+                    ]
+                  },
+                  {
+                    "name": "DeepSeekHistory",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "History Explorer" },
+                      { "name": "component", "type": "string", "content": "DeepSeekHistory" }
+                    ]
+                  },
+                  {
+                    "name": "TestClose",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Test Close" },
+                      { "name": "component", "type": "string", "content": "TestCloseApp" }
+                    ]
+                  },
+                  {
+                    "name": "Settings",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Settings" },
+                      { "name": "component", "type": "string", "content": "Settings" }
+                    ]
+                  },
+                  {
+                    "name": "Utilities",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Utilities" },
+                      { "name": "type", "type": "string", "content": "submenu" },
+                      { "name": "icon", "type": "string", "content": "🧰" },
+                      { "name": "default", "type": "object", "content": ["Regedit", "DBExplorer", "Installer"] },
+                      {
+                        "name": "Regedit",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "Registry Editor" },
+                          { "name": "component", "type": "string", "content": "Regedit" }
+                        ]
+                      },
+                      {
+                        "name": "DBExplorer",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "Database Explorer" },
+                          { "name": "component", "type": "string", "content": "DBExplorer" }
+                        ]
+                      },
+                      {
+                        "name": "Installer",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "App Installer" },
+                          { "name": "component", "type": "string", "content": "Installer" }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ShutDown",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Shut Down..." },
+                      { "name": "type", "type": "string", "content": "action" },
+                      { "name": "icon", "type": "string", "content": "🔌" },
+                      { "name": "actionId", "type": "string", "content": "shutdown" }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "InstalledApps",
+                "type": "key",
+                "content": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
   },
   {
     "name": "HKEY_USERS",
