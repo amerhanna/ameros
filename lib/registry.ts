@@ -452,6 +452,26 @@ class Registry {
     return defaultRegistryHive as RegistryNode[];
   }
 
+  /** Exports the entire registry hive as a JSON Blob for download. */
+  async exportHive(): Promise<Blob> {
+    await this.ensureInitialized();
+    const rawHive = await this.loadHiveRaw();
+    const json = JSON.stringify(rawHive, null, 2);
+    return new Blob([json], { type: 'application/json' });
+  }
+
+  /** Imports a registry hive from a JSON Blob, overwriting the current hive. */
+  async importHive(blob: Blob): Promise<void> {
+    await this.ensureInitialized();
+    const text = await blob.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed) || !parsed.every((node) => this.isRegistryNode(node))) {
+      throw new Error('Invalid registry hive format.');
+    }
+    await this.saveHiveRaw(parsed as RegistryNode[]);
+    window.dispatchEvent(new CustomEvent('reg-update'));
+  }
+
   /** Groundwork for Setup/Recovery: Wipes the system hive */
   async factoryReset() {
     await vfs.delete(this.HIVE_PATH);
