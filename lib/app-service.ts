@@ -39,22 +39,19 @@ class AppService {
    * Links an installed application into the "Programs" folder of the Start Menu.
    */
   async addToStartMenu(appId: string, item: StartMenuItem) {
-    const items = await registry.get<StartMenuItem[]>(this.START_MENU_KEY, []);
+    const parentKey = `${this.START_MENU_KEY}/Programs`;
+    const appKey = `${parentKey}/${appId}`;
     
-    let programsIndex = items.findIndex(i => i.type === 'submenu' && i.label === 'Programs');
+    // 1. Create the entry key with metadata
+    await registry.createKey(appKey);
+    if ('label' in item) await registry.set(`${appKey}/label`, item.label);
+    if ('component' in item) await registry.set(`${appKey}/component`, (item as any).component);
+    if ('launchArgs' in item) await registry.set(`${appKey}/launchArgs`, item.launchArgs || {});
     
-    if (programsIndex === -1) {
-      const newItems: StartMenuItem[] = [
-        { type: 'submenu', label: 'Programs', icon: '📂', items: [item] },
-        ...items
-      ];
-      await registry.set(this.START_MENU_KEY, newItems);
-    } else {
-      const nextItems = [...items];
-      const programs = { ...nextItems[programsIndex] } as Extract<StartMenuItem, { type: 'submenu' }>;
-      programs.items = [...programs.items, item];
-      nextItems[programsIndex] = programs;
-      await registry.set(this.START_MENU_KEY, nextItems);
+    // 2. Update the hierarchy map (Default value of the Programs key)
+    const order = await registry.get<string[]>(parentKey, []);
+    if (!order.includes(appId)) {
+      await registry.set(parentKey, [...order, appId]);
     }
   }
 
@@ -62,23 +59,17 @@ class AppService {
    * Removes all shortcuts for the specified application from the "Programs" folder.
    */
   async removeFromStartMenu(appId: string) {
-    const items = await registry.get<StartMenuItem[]>(this.START_MENU_KEY, []);
+    const parentKey = `${this.START_MENU_KEY}/Programs`;
+    const appKey = `${parentKey}/${appId}`;
     
-    const nextItems = items.map(item => {
-      if (item.type === 'submenu' && item.label === 'Programs') {
-        return {
-          ...item,
-          items: item.items.filter(sub => {
-            if ('launchArgs' in sub && sub.launchArgs?.url === appId) return false;
-            if ('component' in sub && sub.component === appId) return false;
-            return true;
-          })
-        };
-      }
-      return item;
-    });
+    // 1. Delete the entry key record
+    await registry.deleteKey(appKey);
     
-    await registry.set(this.START_MENU_KEY, nextItems);
+    // 2. Remove from the hierarchy map
+    const order = await registry.get<string[]>(parentKey, []);
+    if (order.includes(appId)) {
+      await registry.set(parentKey, order.filter(id => id !== appId));
+    }
   }
 
   /**

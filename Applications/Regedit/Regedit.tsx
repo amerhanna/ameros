@@ -33,10 +33,11 @@ export const getParentKeyPath = (fullPath: string) => {
   return idx === -1 ? fullPath : fullPath.slice(0, idx);
 };
 
-const getValueName = (fullPath: string) => {
+const getValueName = (fullPath: string, parentPath?: string) => {
+  if (parentPath && fullPath.toLowerCase() === parentPath.toLowerCase()) {
+    return "(Default)";
+  }
   const idx = fullPath.lastIndexOf("/");
-  // If the path doesn't contain a slash but isn't a root hive, it might be a top-level value,
-  // but in this logic, we treat terminal segments as value names.
   return idx === -1 ? "(Default)" : fullPath.slice(idx + 1);
 };
 
@@ -124,13 +125,23 @@ export default function Regedit() {
 
   const valueItems = useMemo<RegistryValueItem[]>(() => {
     const items = Object.entries(entries)
-      .map(([fullPath, value]) => ({
-        fullPath,
-        parentPath: getParentKeyPath(fullPath),
-        valueName: getValueName(fullPath),
-        value,
-      }))
-      .filter((item) => item.parentPath === selectedKey);
+      .map(([fullPath, value]) => {
+        const parentPath = getParentKeyPath(fullPath);
+        return {
+          fullPath,
+          parentPath,
+          valueName: getValueName(fullPath, selectedKey),
+          value,
+        };
+      })
+      .filter((item) => {
+        // If it's a default value (fullPath === parentPath), its parent is actually the parent of that key?
+        // No, in our UI logic, when we select a key, we want to see its own default value.
+        // So if item.fullPath === selectedKey, it's the default value for the CURRENT key.
+        if (item.fullPath.toLowerCase() === selectedKey.toLowerCase()) return true;
+        // Otherwise, it's a named value inside the selected key
+        return item.parentPath.toLowerCase() === selectedKey.toLowerCase();
+      });
 
     // Ensure (Default) value exists for the selected key
     const hasDefault = items.some((item) => item.valueName === "(Default)");
