@@ -1,21 +1,13 @@
 {
   "folders": [
-    "C:/Program Files",
-    "C:/Windows"
+    "/home"
   ],
   "files": [
     {
-      "relativePath": "readme.txt",
+      "relativePath": "home/readme.txt",
       "name": "readme.txt",
       "contentBase64": "V2VsY29tZSB0byBBbWVyT1MhDQoNClRoaXMgaXMgeW91ciBwZXJzaXN0ZW50IFZpcnR1YWwgRmlsZSBTeXN0ZW0uDQpZb3UgY2FuIGFsc28gbW91bnQgbG9jYWwgZm9sZGVycyB0byB0aGlzIE9TIHVzaW5nIHRoZSBGaWxlIEV4cGxvcmVyLg0KDQpIZWxsbyB0aGVyZS4NCg==",
       "contentType": "text/plain"
-    }
-  ],
-  "mounts": [
-    {
-      "letter": "C",
-      "handle": null,
-      "label": "AmerOS Boot"
     }
   ]
 }

@@ -25,8 +25,8 @@ class DatabaseService {
    * within the Virtual File System for application data persistence.
    */
   public async init(): Promise<void> {
-    const sysDir = 'C:/System';
-    const appDataDir = 'C:/System/AppData';
+    const sysDir = '/System';
+    const appDataDir = '/System/AppData';
 
     if (!(await vfs.exists(sysDir))) {
       await vfs.mkdir(sysDir);
@@ -52,7 +52,7 @@ class DatabaseService {
     if (!this.connectionPromises[dbId]) {
       this.connectionPromises[dbId] = (async () => {
         // Use /System/AppData for system level persistence
-        const vfsPath = `C:/System/AppData/${appName}/${dbName}.db.json`;
+        const vfsPath = `/System/AppData/${appName}/${dbName}.db.json`;
         
         // Create the database in AlaSQL (only if it doesn't exist)
         if (!alasql.databases[dbId]) {
@@ -107,7 +107,7 @@ class DatabaseService {
   }
 
   private async persistToVFS(appName: string, dbName: string, dbId: string): Promise<void> {
-    const vfsDir = `C:/System/AppData/${appName}`;
+    const vfsDir = `/System/AppData/${appName}`;
     const vfsPath = `${vfsDir}/${dbName}.db.json`;
     
     // Ensure the directory exists

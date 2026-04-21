@@ -1,18 +1,19 @@
 import manifest from './manifest.json';
 
-export interface DefaultVfsFile {
+export interface VFSFile {
   relativePath: string;
   name: string;
   contentBase64: string;
   contentType: string;
 }
 
-export interface DefaultVfsManifest {
-  files: DefaultVfsFile[];
+export interface VFSDefaults {
   folders: string[];
-  mounts: { letter: string; handle: null; label?: string }[];
+  files: VFSFile[];
 }
 
-const defaultVfs: DefaultVfsManifest = manifest as DefaultVfsManifest;
+export { default as manifest } from './manifest.json';
+
+const defaultVfs: VFSDefaults = manifest as VFSDefaults;
 
 export default defaultVfs;

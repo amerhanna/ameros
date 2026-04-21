@@ -30,7 +30,7 @@ export default function DBExplorer() {
   const discoverDatabases = useCallback(async () => {
     setLoading(true);
     try {
-      const appDataPath = 'C:/System/AppData';
+      const appDataPath = '/System/AppData';
       if (!(await vfs.exists(appDataPath))) {
         setDatabases([]);
         return;
@@ -286,7 +286,7 @@ export default function DBExplorer() {
                 {queryResults && (
                    <div className="text-green-400 mb-2">✓ Success: {queryResults.length} records affected.</div>
                 )}
-                <div className="text-gray-500 mb-1">$ DB_SCAN --target=C:/System/AppData</div>
+                <div className="text-gray-500 mb-1">$ DB_SCAN --target=/System/AppData</div>
                 <div className="text-gray-400 mb-2">Scanning... found {databases.length} active databases.</div>
                 {selectedDB && (
                    <div className="text-blue-500 mb-1 animate-pulse">

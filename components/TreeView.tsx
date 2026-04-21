@@ -64,6 +64,37 @@ export function TreeView<TItem extends TreeNode>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultExpanded.join(',')]);
 
+  // Auto-expand parents when the selected key changes
+  useEffect(() => {
+    if (!selectedKey || selectedKey === '/') return;
+
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      
+      const parts = selectedKey.split('/').filter(Boolean);
+      let current = '';
+      
+      // Expand each parent level
+      // e.g., for /home/dev/project, expand /, /home, /home/dev
+      // First, expand root
+      if (!next.has('/')) {
+        next.add('/');
+        changed = true;
+      }
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        current += '/' + parts[i];
+        if (!next.has(current)) {
+          next.add(current);
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [selectedKey]);
+
   const toggleExpand = (key: string) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);

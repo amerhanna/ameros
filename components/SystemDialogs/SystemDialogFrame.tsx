@@ -20,7 +20,7 @@ interface SystemDialogFrameProps {
 
 export function SystemDialogFrame({
   confirmLabel,
-  initialPath = 'C:',
+  initialPath = '/',
   selectionMode,
   onConfirm,
   onCancel,
@@ -43,7 +43,7 @@ export function SystemDialogFrame({
       setError(null);
       try {
         if (!(await vfs.exists(path)) && path !== '/') {
-          path = 'C:';
+          path = '/';
         }
         const content = await vfs.ls(path);
         let filtered = content;
@@ -109,8 +109,8 @@ export function SystemDialogFrame({
 
   const handleOpen = async (node: VFSNode) => {
     if (node.status === 'prompt') {
-      const letter = node.path.split(':')[0];
-      const granted = await vfs.requestPermission(letter);
+      const name = node.path.split('/').pop()!;
+      const granted = await vfs.requestPermission(name);
       if (granted) {
         setCurrentPath(node.path);
         loadFolderItems();
@@ -126,7 +126,7 @@ export function SystemDialogFrame({
       return;
     }
 
-    if (node.type === 'dir' || node.type === 'drive') {
+    if (node.type === 'dir' || node.isMountPoint) {
       setHistory((prev) => [...prev, currentPath]);
       loadFolder(node.path);
       if (selectionMode === 'folder') {
@@ -153,19 +153,14 @@ export function SystemDialogFrame({
   const handleUp = () => {
     if (currentPath === '/' || currentPath === '') return;
 
-    if (currentPath.match(/^[A-Z]:$/)) {
+    if (currentPath.split('/').filter(Boolean).length <= 1) {
       setHistory((prev) => [...prev, currentPath]);
       loadFolder('/');
       return;
     }
 
     const lastSlash = currentPath.lastIndexOf('/');
-    let newPath = '/';
-    if (lastSlash === -1) {
-      newPath = '/';
-    } else {
-      newPath = currentPath.substring(0, lastSlash) || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/');
-    }
+    const newPath = lastSlash <= 0 ? '/' : currentPath.substring(0, lastSlash);
     setHistory((prev) => [...prev, currentPath]);
     loadFolder(newPath);
     setSelectedName('');

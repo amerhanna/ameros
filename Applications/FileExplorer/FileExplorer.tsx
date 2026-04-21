@@ -73,7 +73,7 @@ export default function FileExplorer() {
         toast.error('VFS Error: ' + (err as Error).message);
       }
     },
-    [treeLoaded]
+    []
   );
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export default function FileExplorer() {
       return;
     }
 
-    if (node.type === 'dir' || node.type === 'drive') {
+    if (node.type === 'dir' || node.isMountPoint) {
       navigateTo(node.path);
     } else {
       if (node.name.toLowerCase().endsWith('.txt')) {
@@ -138,19 +138,12 @@ export default function FileExplorer() {
   };
 
   const handleUp = () => {
-    if (currentPath === '/' || currentPath === '' || currentPath === '/') return;
-
-    if (currentPath.match(/^[A-Z]:$/)) {
-      navigateTo('/');
-      return;
-    }
-
-    const lastSlash = currentPath.lastIndexOf('/');
-    if (lastSlash === -1 || lastSlash === 0) {
+    if (currentPath === '/') return;
+    const parts = currentPath.split('/').filter(Boolean);
+    if (parts.length <= 1) {
       navigateTo('/');
     } else {
-      const newPath = currentPath.substring(0, lastSlash);
-      navigateTo(newPath || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/'));
+      navigateTo('/' + parts.slice(0, -1).join('/'));
     }
   };
 
@@ -162,6 +155,7 @@ export default function FileExplorer() {
       const letter = await vfs.mountFolder(handle);
       await vfs.requestPermission(letter);
       loadFolderItems();
+      loadTreeItems();
       toast.success('Folder mounted successfully');
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -172,17 +166,16 @@ export default function FileExplorer() {
   };
 
   const handleUnmount = async () => {
-    const pathTarget = selectedPath;
-    if (pathTarget && pathTarget.match(/^[A-Z]:\/?$/) && !pathTarget.startsWith('C:')) {
-      const letter = pathTarget[0];
+    if (selectedPath && vfs.isMountPoint(selectedPath)) {
+      const name = selectedPath.split('/').pop()!;
       try {
-        await vfs.unmountFolder(letter);
+        await vfs.unmountFolder(name);
         navigateTo('/');
         loadFolderItems();
         loadTreeItems();
-        toast.success(`Drive ${letter}: unmounted`);
+        toast.success(`Mount '${name}' unmounted`);
       } catch (err) {
-        toast.error('Failed to unmount drive');
+        toast.error('Failed to unmount folder');
       }
     }
   };
@@ -205,9 +198,6 @@ export default function FileExplorer() {
 
   const handleRename = async (path: string) => {
     let oldName = path.split('/').pop() || '';
-    if (path.match(/^[A-Z]:$/)) {
-      oldName = await vfs.getVolumeLabel(path[0]);
-    }
     openChildWindow({
       title: 'Rename',
       component: () => (
@@ -396,7 +386,7 @@ export default function FileExplorer() {
         onUp={handleUp}
         canMount={currentPath === '/'}
         onMount={handleMount} 
-        canUnmount={selectedPath !== null && selectedPath.match(/^[A-Z]:\/?$/) !== null && !selectedPath.startsWith('C:')}
+        canUnmount={selectedPath !== null && vfs.isMountPoint(selectedPath)}
         onUnmount={handleUnmount}
         onPathChange={handlePathChange}
       />
@@ -406,7 +396,7 @@ export default function FileExplorer() {
           {/* Sidebar */}
           <div className="h-full border-r border-slate-200">
             <FolderTreeView
-              currentPath={'/'}
+              currentPath={currentPath}
               items={treeData}
               loading={!treeLoaded}
               error={error}
@@ -442,7 +432,7 @@ export default function FileExplorer() {
             items={
               !contextMenu.item
                 ? emptySpaceMenuItems
-                : contextMenu.item.path === 'C:' || contextMenu.item.path.endsWith(':')
+                : contextMenu.item.isMountPoint
                 ? driveMenuItems
                 : fileMenuItems
             }

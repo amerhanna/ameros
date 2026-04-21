@@ -31,10 +31,10 @@ const formatDate = (timestamp: number) => {
   return date.toLocaleString();
 };
 
-const formatFileType = (name: string, path: string, type: string) => {
+const formatFileType = (name: string, path: string, type: string, isMountPoint?: boolean) => {
   if (type === "dir") return "File Folder";
   if (type === "drive") {
-    if (path === "C:") return "Internal Storage";
+    if (isMountPoint) return "System Drive";
     return "Mounted Drive";
   }
   const ext = name.split(".").pop()?.toUpperCase() || "";
@@ -54,9 +54,7 @@ export function FolderView({
   onRetry,
 }: FolderViewProps) {
   const getIcon = (item: VFSNode) => {
-    const isDrive = item.path === "C:" || item.path.endsWith(":");
-
-    if (isDrive) {
+    if (item.isMountPoint) {
       return <HardDrive className="w-10 h-10 text-blue-600" />;
     }
 
