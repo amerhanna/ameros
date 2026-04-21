@@ -48,7 +48,7 @@ export default function FileExplorer() {
     setLoading(true);
     setError(null);
     try {
-      const content = await vfs.ls(currentPath);
+      const content = await vfs.ls(currentPath, { types: 'all' });
       setItems(content);
     } catch (err) {
       setError((err as Error).message);
@@ -65,7 +65,7 @@ export default function FileExplorer() {
   const loadTreeItems = useCallback(
     async () => {
       try {
-          const tree = await vfs.getTree();
+          const tree = await vfs.ls('/', { types: 'dir', depth: 2 });
           setTreeData(tree);
           setTreeLoaded(true);
       } catch (err) {
@@ -198,9 +198,10 @@ export default function FileExplorer() {
   };
 
   const handleToggle = useCallback(async (item: VFSNode, expanded: boolean) => {
-    if (expanded && (!item.children || item.children.length === 0)) {
+    // If expanded and we only have basic info (depth 1 or shallow depth 2), fetch deeper structure
+    if (expanded) {
       try {
-        const children = await vfs.getChildren(item.path);
+        const children = await vfs.ls(item.path, { types: 'dir', depth: 2 });
         setTreeData((prev) => {
           const updateNodes = (nodes: VFSNode[]): VFSNode[] => {
             return nodes.map((node) => {

@@ -21,9 +21,16 @@ export interface VFSNode {
   children?: VFSNode[];
 }
 
+export interface LSOptions {
+  types?: 'file' | 'dir' | 'all';
+  name?: string;
+  depth?: number;
+  isSearch?: boolean;
+}
+
 export type FolderNode = VFSNode;
 export type DriveNode = VFSNode;
-export type FolderTreeNode = VFSNode; // Unified type for tree view
+export type FolderTreeNode = VFSNode;
 
 export interface VFSProperties {
   size: number;
@@ -70,7 +77,7 @@ class VFS {
             mounts: {
               '/': { backend: WebAccess, handle: opfsHandle },
               '/System': IndexedDB,
-              '/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
+              '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
             }
           });
         } else {
@@ -82,7 +89,7 @@ class VFS {
           mounts: {
             '/': IndexedDB,
             '/System': IndexedDB,
-            '/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
+            '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
           }
         });
       }
@@ -166,7 +173,7 @@ class VFS {
   private async seedDefaults() {
     try {
       // 1. Ensure core system directories exist
-      const coreDirs = ['/home', '/System', '/mnt', SYSTEM_MOUNTS_DIR];
+      const coreDirs = ['/home', '/System', SYSTEM_MOUNTS_DIR];
       for (const dir of coreDirs) {
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
@@ -243,10 +250,9 @@ class VFS {
       ]);
 
       // 2. Mount each one
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i];
-      const handle = handles[i];
-      const mountPath = `/mnt/${name}`;
+    for (const name of names) {
+      const handle = handles[names.indexOf(name)];
+      const mountPath = `/${name}`;
 
       try {
         const config = await resolveMountConfig({ backend: WebAccess, handle });
@@ -258,7 +264,6 @@ class VFS {
           this.mountPoints.add(name);
           console.log(`VFS: Restored mount ${mountPath}`);
         } catch (mountErr) {
-          // If already mounted, skip
           if (String(mountErr).includes('already in use')) {
             this.mountPoints.add(name);
           } else {
@@ -285,21 +290,24 @@ class VFS {
    * - Shows mounts from /mnt directly as if top-level
    * - Hides /System, /mnt (the parent), and others unless showHidden is true
    */
-  async ls(path: string, showHidden = false): Promise<VFSNode[]> {
+  async ls(path: string, options: LSOptions = { depth: 1 }): Promise<VFSNode[]> {
     await this.init();
     const normalized = this.normalize(path);
+    const { types = 'all', name = '*', depth = 1, isSearch = false } = options;
+    const nameRegex = this.wildcardToRegex(name);
 
-    if (normalized === '/') {
+    // Root-specific curated view logic (only for depth 1 at '/')
+    if (normalized === '/' && depth === 1 && !isSearch) {
       const results: VFSNode[] = [];
       
-      // Add Home
+      // Home is ALWAYS first
       if (fs.existsSync('/home')) {
         results.push(await this.getNodeInfo('/home', 'Home'));
       }
 
-      // Add Mounts directly to root view
+      // Add Mounts
       for (const mount of this.mountPoints) {
-        const mountPath = `/mnt/${mount}`;
+        const mountPath = `/${mount}`;
         if (fs.existsSync(mountPath)) {
           results.push({
             ...(await this.getNodeInfo(mountPath, mount)),
@@ -307,25 +315,103 @@ class VFS {
           });
         }
       }
+      return this.filterNodes(results, { types, nameRegex });
+    }
 
-      if (showHidden) {
-        const entries = await fs.promises.readdir('/', { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.name === 'home' || entry.name === 'mnt') continue;
-          results.push(this.formatDirent('/', entry));
+    // Standard recursive traversal, skipping internal folders at the root
+    const results: VFSNode[] = [];
+    const walk = async (currPath: string, currDepth: number) => {
+      try {
+        const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
+        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
+
+        for (const node of nodes) {
+          const matchesType = types === 'all' || node.type === types;
+          const matchesName = nameRegex.test(node.name);
+
+          // If it matches, add it to results based on search/nested mode
+          if (matchesType && matchesName) {
+            if (isSearch) {
+              results.push(node);
+            } else if (currDepth === depth) {
+              results.push(node);
+            }
+          }
+
+          // Recurse if needed
+          if (node.type === 'dir' && currDepth < depth) {
+            const children = await walk(node.path, currDepth + 1);
+            if (!isSearch && !matchesName && matchesType) {
+                // If we are building a tree and this folder didn't match but we are going deeper? 
+                // Usually ls(depth) means we want the structure.
+            }
+            if (!isSearch) {
+               node.children = children;
+               if (currDepth === depth - 1 && !isSearch) {
+                 // We only add top-level nodes to results in nested mode
+                 if (currPath === normalized) {
+                    results.push(node);
+                 }
+               }
+            }
+          }
         }
+        return nodes;
+      } catch (err) {
+        return [];
       }
+    };
 
+    // Refined recursive logic for unified ls
+    const recursiveList = async (currPath: string, currDepth: number): Promise<VFSNode[]> => {
+      try {
+        const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
+        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
+        const matchedNodes: VFSNode[] = [];
+
+        for (const node of nodes) {
+          // Explicitly hide system folders from the top level
+          if (currPath === '/' && (node.name === 'System' || node.name === 'mnt')) continue;
+
+          const matchesType = types === 'all' || node.type === types;
+          const matchesName = nameRegex.test(node.name);
+
+          if (node.type === 'dir' && currDepth < depth) {
+            node.children = await recursiveList(node.path, currDepth + 1);
+          }
+
+          if (isSearch) {
+            if (matchesType && matchesName) results.push(node);
+          } else {
+            if (matchesType && matchesName) matchedNodes.push(node);
+          }
+        }
+        return matchedNodes;
+      } catch {
+        return [];
+      }
+    };
+
+    if (isSearch) {
+      await recursiveList(normalized, 1);
       return results;
+    } else {
+      return await recursiveList(normalized, 1);
     }
+  }
 
-    try {
-      const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
-      return entries.map(entry => this.formatDirent(normalized, entry));
-    } catch (err) {
-      console.error(`VFS: ls failed for ${normalized}:`, err);
-      return [];
-    }
+  private filterNodes(nodes: VFSNode[], criteria: { types: string, nameRegex: RegExp }): VFSNode[] {
+    return nodes.filter(node => {
+      const matchesType = criteria.types === 'all' || node.type === criteria.types;
+      const matchesName = criteria.nameRegex.test(node.name);
+      return matchesType && matchesName;
+    });
+  }
+
+  private wildcardToRegex(pattern: string): RegExp {
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    const regex = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+    return new RegExp(`^${regex}$`, 'i');
   }
 
   private formatDirent(parent: string, entry: any): VFSNode {
@@ -335,7 +421,7 @@ class VFS {
       name: entry.name,
       type: entry.isDirectory() ? 'dir' : 'file',
       lastModified: Date.now(), // Metadata should be fetched lazily if needed
-      isMountPoint: path.startsWith('/mnt/') && path.split('/').filter(Boolean).length === 2
+      isMountPoint: this.isMountPoint(path)
     };
   }
 
@@ -348,14 +434,15 @@ class VFS {
         name,
         type: stats.isDirectory() ? 'dir' : 'file',
         lastModified: stats.mtimeMs,
-        isMountPoint: path.startsWith('/mnt/') && path.split('/').filter(Boolean).length === 2
+        isMountPoint: this.isMountPoint(path)
       };
     } catch (err) {
       return {
         path,
         name: alias || path.split('/').filter(Boolean).pop() || 'unknown',
         type: 'file',
-        lastModified: Date.now()
+        lastModified: Date.now(),
+        isMountPoint: this.isMountPoint(path)
       };
     }
   }
@@ -478,10 +565,10 @@ class VFS {
 
   async mountFolder(handle: FileSystemDirectoryHandle): Promise<string> {
     await this.init();
-    const name = handle.name;
-    const mountPath = `/mnt/${name}`;
+    const name = this.getUniqueMountName(handle.name);
+    const mountPath = `/${name}`;
 
-    // 1. Check if already mounted
+    // 1. Check if already mounted (should be handled by getUniqueMountName, but for safety)
     if (this.mountPoints.has(name)) {
       console.log(`VFS: ${name} is already mounted, skipping.`);
       return name;
@@ -528,7 +615,7 @@ class VFS {
 
   async unmountFolder(name: string) {
     await this.init();
-    const mountPath = `/mnt/${name}`;
+    const mountPath = `/${name}`;
     
     try {
       fs.umount(mountPath);
@@ -554,10 +641,28 @@ class VFS {
   async getMounts() {
     await this.init();
     return Array.from(this.mountPoints).map(name => ({
-      letter: name, // Legacy compatibility
+      letter: name, 
       name: name,
-      path: `/mnt/${name}`
+      path: `/${name}`
     }));
+  }
+
+  private getUniqueMountName(name: string): string {
+    const reserved = ['home', 'System', 'mnt', 'System/mnt'];
+    let finalName = name;
+    let counter = 1;
+
+    const isTaken = (n: string) => 
+      this.mountPoints.has(n) || 
+      reserved.some(r => r.toLowerCase() === n.toLowerCase()) ||
+      fs.existsSync(`/${n}`);
+
+    while (isTaken(finalName)) {
+      counter++;
+      finalName = `${name}-${counter}`;
+    }
+
+    return finalName;
   }
 
   async checkPermission(name: string): Promise<'granted' | 'denied' | 'prompt'> {
@@ -568,50 +673,7 @@ class VFS {
     return true;
   }
 
-  /**
-   * Fetches the tree structure.
-   * Strictly ignores files to ensure speed.
-   */
-  async getTree(path = '/', depth = 1): Promise<VFSNode[]> {
-    await this.init();
-    const items = await this.getChildren(path);
-    
-    if (depth <= 0) return items;
-
-    for (const item of items) {
-      try {
-        item.children = await this.getTree(item.path, depth - 1);
-      } catch (err) {
-        // Skip inaccessible
-      }
-    }
-
-    return items;
-  }
-
-  /**
-   * Fetches immediate children of a path. 
-   * Strictly filters out files for the tree view.
-   */
-  async getChildren(path: string): Promise<VFSNode[]> {
-    await this.init();
-    const normalized = this.normalize(path);
-
-    if (normalized === '/') {
-      const rootItems = await this.ls('/');
-      return rootItems.filter(node => node.type === 'dir' || node.isMountPoint);
-    }
-
-    try {
-      const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
-      return entries
-        .filter(entry => entry.isDirectory())
-        .map(entry => this.formatDirent(normalized, entry));
-    } catch (err) {
-      console.error(`VFS: getChildren failed for ${normalized}:`, err);
-      return [];
-    }
-  }
+  // Deprecated methods replaced by unified ls()
 
   async exportStorage(excludePaths: string[] = []): Promise<Blob> {
     await this.init();
@@ -707,8 +769,14 @@ class VFS {
   }
 
   isMountPoint(path: string): boolean {
-    const parts = this.normalize(path).split('/').filter(Boolean);
-    return parts.length === 2 && parts[0] === 'mnt';
+    const normalized = this.normalize(path);
+    const parts = normalized.split('/').filter(Boolean);
+    const name = parts[0];
+    
+    return parts.length === 1 && 
+           name !== 'home' && 
+           name !== 'System' && 
+           this.mountPoints.has(name);
   }
 
   getVolumeLabel(name: string): string {
