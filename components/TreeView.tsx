@@ -23,6 +23,7 @@ export interface TreeViewProps<TItem> {
   getStatusIcon?: (item: TItem) => ReactNode | null;
   onSelect?: (item: TItem) => void;
   onOpen?: (item: TItem) => void;
+  onToggle?: (item: TItem, expanded: boolean) => void;
   onContextMenu?: (e: MouseEvent<HTMLDivElement>, item: TItem | null) => void;
   onRetry?: () => void;
 }
@@ -40,6 +41,7 @@ export function TreeView<TItem extends TreeNode>({
   getStatusIcon,
   onSelect,
   onOpen,
+  onToggle,
   onContextMenu,
   onRetry,
 }: TreeViewProps<TItem>) {
@@ -64,14 +66,48 @@ export function TreeView<TItem extends TreeNode>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultExpanded.join(',')]);
 
-  const toggleExpand = (key: string) => {
+  // Auto-expand parents when the selected key changes
+  useEffect(() => {
+    if (!selectedKey || selectedKey === '/') return;
+
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
+      let changed = false;
+      
+      const parts = selectedKey.split('/').filter(Boolean);
+      let current = '';
+      
+      // Expand each parent level
+      // e.g., for /home/dev/project, expand /, /home, /home/dev
+      // First, expand root
+      if (!next.has('/')) {
+        next.add('/');
+        changed = true;
+      }
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        current += '/' + parts[i];
+        if (!next.has(current)) {
+          next.add(current);
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [selectedKey]);
+
+  const toggleExpand = (item: TItem) => {
+    const key = getKey(item);
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      const isCurrentlyExpanded = next.has(key);
+      if (isCurrentlyExpanded) {
         next.delete(key);
       } else {
         next.add(key);
       }
+      onToggle?.(item, !isCurrentlyExpanded);
       return next;
     });
   };
@@ -106,7 +142,7 @@ export function TreeView<TItem extends TreeNode>({
             onClick={(e) => {
               e.stopPropagation();
               if (hasChildren) {
-                toggleExpand(key);
+                toggleExpand(item);
               }
             }}
           >

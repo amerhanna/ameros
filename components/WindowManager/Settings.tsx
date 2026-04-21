@@ -10,7 +10,7 @@ import { vfs } from "@/lib/vfs"
 import { toast } from "sonner"
 import { Download, Upload, RotateCcw, Trash2, AlertTriangle } from "lucide-react"
 
-const REGISTRY_PATH = "C:/Windows/System32/config/SYSTEM.reg";
+const REGISTRY_PATH = "/System/config/SYSTEM.reg";
 
 /** Triggers a browser file download from a Blob. */
 function downloadBlob(blob: Blob, filename: string) {
@@ -160,7 +160,7 @@ export default function Settings() {
 
   const handleResetStorage = () =>
     setConfirm({
-      message: "This will delete all files on the internal storage (C: drive), excluding the registry. The system will reload.",
+      message: "This will delete all files on the internal storage (root filesystem), excluding the registry. The system will reload.",
       action: async () => {
         await vfs.clearStorage([REGISTRY_PATH]);
         toast.success("Internal storage cleared. Reloading...");
@@ -251,9 +251,7 @@ export default function Settings() {
           {/* Internal Storage Management */}
           <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-base font-semibold mb-1">Internal Storage</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Export, import, or reset files on the C: drive. The registry file is excluded from these operations.
-            </p>
+              Export, import, or reset files on the root filesystem. The registry file is excluded from these operations.
             <div className="flex flex-wrap gap-2">
               <ActionButton
                 icon={Download}

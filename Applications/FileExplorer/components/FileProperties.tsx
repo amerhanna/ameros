@@ -31,13 +31,13 @@ export function FileProperties({ path }: FilePropertiesProps) {
   if (!props) return <div className="p-4 text-center text-red-500">Error loading properties</div>
 
   const name = props.path.split("/").pop() || props.path
-  const isC = props.path === "C:"
+  const isMount = vfs.isMountPoint(props.path)
 
   return (
     <div className="p-4 bg-[#f0f0f0] h-full overflow-auto space-y-4 text-xs sm:text-sm border-t border-white">
       <div className="flex items-center gap-4 border-b border-[#808080] pb-4">
         <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
-            {isC ? <HardDrive className="w-10 h-10 text-blue-600" /> : 
+            {isMount ? <HardDrive className="w-10 h-10 text-blue-600" /> : 
              props.type === 'dir' ? <Folder className="w-10 h-10 text-amber-400" /> : 
              <FileIcon className="w-10 h-10 text-slate-400" />}
         </div>

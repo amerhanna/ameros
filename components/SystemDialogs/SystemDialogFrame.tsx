@@ -20,7 +20,7 @@ interface SystemDialogFrameProps {
 
 export function SystemDialogFrame({
   confirmLabel,
-  initialPath = 'C:',
+  initialPath = '/',
   selectionMode,
   onConfirm,
   onCancel,
@@ -43,7 +43,7 @@ export function SystemDialogFrame({
       setError(null);
       try {
         if (!(await vfs.exists(path)) && path !== '/') {
-          path = 'C:';
+          path = '/';
         }
         const content = await vfs.ls(path);
         let filtered = content;
@@ -65,7 +65,7 @@ export function SystemDialogFrame({
     setLoading(true);
     setError(null);
     try {
-      const content = await vfs.ls(currentPath);
+      const content = await vfs.ls(currentPath, { types: 'all' });
       setItems(content);
     } catch (err) {
       setError((err as Error).message);
@@ -80,10 +80,10 @@ export function SystemDialogFrame({
 
   const loadTreeItems = useCallback(
     async () => {
-    try {
-      const tree = await vfs.getTree();
-      setTreeData(tree);
-      setTreeLoaded(true);
+      try {
+        const tree = await vfs.ls('/', { types: 'dir', depth: 2 });
+        setTreeData(tree);
+        setTreeLoaded(true);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -99,6 +99,19 @@ export function SystemDialogFrame({
     loadTreeItems();
   }, [loadTreeItems]);
 
+  useEffect(() => {
+    const handleVfsChange = (e: any) => {
+      const { path } = e.detail;
+      if (path === '/' || path === currentPath || currentPath.startsWith(path)) {
+        loadFolderItems();
+        loadTreeItems();
+      }
+    };
+
+    window.addEventListener('vfs-change', handleVfsChange);
+    return () => window.removeEventListener('vfs-change', handleVfsChange);
+  }, [currentPath, loadFolderItems, loadTreeItems]);
+
   const handleSelect = (node: VFSNode) => {
     if (node.type === 'file' && (selectionMode === 'file' || selectionMode === 'save')) {
       setSelectedName(node.name);
@@ -109,8 +122,8 @@ export function SystemDialogFrame({
 
   const handleOpen = async (node: VFSNode) => {
     if (node.status === 'prompt') {
-      const letter = node.path.split(':')[0];
-      const granted = await vfs.requestPermission(letter);
+      const name = node.path.split('/').pop()!;
+      const granted = await vfs.requestPermission(name);
       if (granted) {
         setCurrentPath(node.path);
         loadFolderItems();
@@ -126,7 +139,7 @@ export function SystemDialogFrame({
       return;
     }
 
-    if (node.type === 'dir' || node.type === 'drive') {
+    if (node.type === 'dir' || node.isMountPoint) {
       setHistory((prev) => [...prev, currentPath]);
       loadFolder(node.path);
       if (selectionMode === 'folder') {
@@ -153,23 +166,42 @@ export function SystemDialogFrame({
   const handleUp = () => {
     if (currentPath === '/' || currentPath === '') return;
 
-    if (currentPath.match(/^[A-Z]:$/)) {
+    if (currentPath.split('/').filter(Boolean).length <= 1) {
       setHistory((prev) => [...prev, currentPath]);
       loadFolder('/');
       return;
     }
 
     const lastSlash = currentPath.lastIndexOf('/');
-    let newPath = '/';
-    if (lastSlash === -1) {
-      newPath = '/';
-    } else {
-      newPath = currentPath.substring(0, lastSlash) || (currentPath.includes(':') ? currentPath.split(':')[0] + ':' : '/');
-    }
+    const newPath = lastSlash <= 0 ? '/' : currentPath.substring(0, lastSlash);
     setHistory((prev) => [...prev, currentPath]);
     loadFolder(newPath);
     setSelectedName('');
   };
+
+  const handleToggle = useCallback(async (item: VFSNode, expanded: boolean) => {
+    if (expanded) {
+      try {
+        const children = await vfs.ls(item.path, { types: 'dir', depth: 2 });
+        setTreeData((prev) => {
+          const updateNodes = (nodes: VFSNode[]): VFSNode[] => {
+            return nodes.map((node) => {
+              if (node.path === item.path) {
+                return { ...node, children };
+              }
+              if (node.children) {
+                return { ...node, children: updateNodes(node.children) };
+              }
+              return node;
+            });
+          };
+          return updateNodes(prev);
+        });
+      } catch (err) {
+        // Silent fail for dialogs or handle gracefully
+      }
+    }
+  }, []);
 
   const handleConfirm = () => {
     if (selectionMode === 'folder') {
@@ -240,6 +272,7 @@ export function SystemDialogFrame({
               selectedPath={currentPath}
               onOpen={handleOpen}
               onSelect={handleOpen}
+              onToggle={handleToggle}
               onContextMenu={() => {}}
               onRetry={() => loadTreeItems()}
             />

@@ -78,16 +78,6 @@ class BootSequencer {
     });
 
     this.registerTask({
-      id: "virtual-mounts",
-      stage: BootStage.SERVICES,
-      description: "Restoring Volume Mounts...",
-      execute: async () => {
-        // Placeholder: Fetch saved FSA handles from registry and re-mount to VFS
-        // const savedMounts = await registry.get('HKEY_LOCAL_MACHINE/System/Mounts', {});
-      },
-    });
-
-    this.registerTask({
       id: "user-environment",
       stage: BootStage.ENVIRONMENT,
       description: "Loading User Environment...",

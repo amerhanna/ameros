@@ -1,1019 +1,801 @@
 'use client';
 
+import { configure, fs, resolveMountConfig, type Backend } from '@zenfs/core';
+import { IndexedDB, WebAccess } from '@zenfs/dom';
 import defaultVfs from './vfs-defaults';
 
 /**
  * AmerOS Virtual File System (VFS) - Phase 2
- * Persists to IndexedDB and supports external directory mounting via File System Access API.
- * Supports recursive operations, cross-drive transfers (C: <=> D:), and volume labels.
+ * Powered by ZenFS (@zenfs/core + @zenfs/dom)
+ * Root (/) -> OPFS (WebAccess) for speed
+ * System (/System) -> IndexedDB for OS metadata isolation
  */
 
-/**
- * Core structural model for all nodes existing within the VFS index.
- */
-export interface BaseVFSNode {
+export interface VFSNode {
   path: string;
   name: string;
-  type: 'drive' | 'dir' | 'file';
+  type: 'dir' | 'file';
   lastModified: number;
-  handle?: FileSystemHandle; // For mounted external files/dirs
+  isMountPoint?: boolean;
   status?: 'granted' | 'denied' | 'prompt';
+  children?: VFSNode[];
 }
 
-export interface DriveNode extends BaseVFSNode {
-  type: 'drive';
-  children?: FolderTreeNode[];
+export interface LSOptions {
+  types?: 'file' | 'dir' | 'all';
+  name?: string;
+  depth?: number;
+  isSearch?: boolean;
 }
 
-export interface FolderNode extends BaseVFSNode {
-  type: 'dir';
-  children?: FolderTreeNode[];
-}
-
-export interface FileNode extends BaseVFSNode {
-  type: 'file';
-  content?: string | ArrayBuffer | Blob | File;
-}
-
-export type VFSNode = DriveNode | FolderNode | FileNode;
-
-export type FolderTreeNode = DriveNode | FolderNode;
-
-export interface VFSMount {
-  letter: string;
-  handle: FileSystemDirectoryHandle;
-  label?: string;
-}
+export type FolderNode = VFSNode;
+export type DriveNode = VFSNode;
+export type FolderTreeNode = VFSNode;
 
 export interface VFSProperties {
   size: number;
   lastModified: number;
-  type: 'drive' | 'file' | 'dir';
+  type: 'file' | 'dir';
   readOnly: boolean;
   path: string;
 }
 
-type FileSystemPermissionMode = 'read' | 'readwrite';
+const OLD_DB_NAME = 'AmerOS_VFS';
+const SYSTEM_MOUNTS_DIR = '/System/mounts';
 
-const DB_NAME = 'AmerOS_VFS';
-const DB_VERSION = 2;
-const STORE_FILES = 'files';
-const STORE_MOUNTS = 'mounts';
-
-/**
- * The Virtual File System API Engine.
- * Transparently manages FileSystem Access API volume mounts alongside a persistent IDB storage fallback (`C:` drive).
- * Provides node traversal, CRUD operations, permission negotiation, and observability.
- */
 class VFS {
-  private db: IDBDatabase | null = null;
-  private mounts: Record<string, VFSMount> = {};
   private initPromise: Promise<void> | null = null;
+  private mountPoints: Set<string> = new Set();
 
   async init() {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      this.db = await new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(STORE_FILES)) {
-            db.createObjectStore(STORE_FILES, { keyPath: 'path' });
-          }
-          if (!db.objectStoreNames.contains(STORE_MOUNTS)) {
-            db.createObjectStore(STORE_MOUNTS, { keyPath: 'letter' });
-          }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
+      // 1. Request persistence
+      if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+        try {
+          await navigator.storage.persist();
+        } catch (err) {
+          console.warn('VFS: Storage persistence request failed', err);
+        }
+      }
 
-      await this.loadMounts();
-      await this.ensureInitialBoot();
+      // 2. Configure ZenFS
+      // We prioritize OPFS (WebAccess) but fallback to IndexedDB if unavailable
+      try {
+        let opfsHandle: any = null;
+        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+          try {
+            opfsHandle = await navigator.storage.getDirectory();
+          } catch (err) {
+            console.warn('VFS: Failed to get OPFS directory handle', err);
+          }
+        }
+
+        if (opfsHandle) {
+          await configure({
+            mounts: {
+              '/': { backend: WebAccess, handle: opfsHandle },
+              '/System': IndexedDB,
+              '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
+            }
+          });
+        } else {
+          throw new Error('OPFS not available');
+        }
+      } catch (err) {
+        console.warn('VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root', err);
+        await configure({
+          mounts: {
+            '/': IndexedDB,
+            '/System': IndexedDB,
+            '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
+          }
+        });
+      }
+
+      // 3. Seed Defaults
+      await this.seedDefaults();
+ 
+      // 4. Data Migration (Optional)
+      await this.migrateLegacyData();
+ 
+      // 5. Load saved mounts (Background - Non-blocking)
+      this.restoreMounts().catch(err => console.warn('VFS: Background mount restoration failed', err));
+
+      console.log('VFS: ZenFS initialized at root (/)');
     })();
 
     return this.initPromise;
   }
 
-  private async loadMounts() {
-    const transaction = this.db!.transaction(STORE_MOUNTS, 'readonly');
-    const store = transaction.objectStore(STORE_MOUNTS);
-    const request = store.getAll();
-
-    return new Promise<void>((resolve, reject) => {
-      request.onsuccess = () => {
-        const results = request.result;
-        results.forEach((m: VFSMount) => {
-          this.mounts[m.letter] = m;
-        });
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  private async ensureInitialBoot() {
-    // We use getNode directly to avoid deadlocking with exists() -> await init()
-    const readme = await this.getNode('C:/readme.txt');
-    if (!readme) {
-      // Direct IDB writes to bypass public methods (mkdir, writeFile, setVolumeLabel)
-      // because they all call `await this.init()` now, which would cause an infinite lock.
-      const folderRecords: Record<string, any>[] = defaultVfs.folders.map((folderPath) => ({
-        path: folderPath,
-        name: folderPath.substring(folderPath.lastIndexOf('/') + 1),
-        type: 'dir',
-        lastModified: Date.now(),
-      }));
-
-      const fileRecords = defaultVfs.files.map((file) => {
-        const binary = atob(file.contentBase64);
-        const array = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i += 1) {
-          array[i] = binary.charCodeAt(i);
-        }
-
-        return {
-          path: `C:/${file.relativePath}`,
-          name: file.name,
-          type: 'file',
-          lastModified: Date.now(),
-          content: new Blob([array], { type: file.contentType }),
-        };
-      });
-
-      const transaction = this.db!.transaction([STORE_FILES, STORE_MOUNTS], 'readwrite');
-      const fileStore = transaction.objectStore(STORE_FILES);
-      const mountStore = transaction.objectStore(STORE_MOUNTS);
-
-      for (const record of [...folderRecords, ...fileRecords]) {
-        fileStore.put(record);
-      }
-
-      for (const mount of defaultVfs.mounts) {
-        mountStore.put(mount);
-        this.mounts[mount.letter] = mount as any;
-      }
-
-      return new Promise<void>((resolve, reject) => {
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }
-  }
-
-  /**
-   * Checks if a specified path string completely resolves to a valid node within the VFS index.
-   * @param path Full path route (e.g., 'C:/Windows/System32')
-   */
-  async exists(path: string): Promise<boolean> {
-    await this.init();
-    const node = await this.getNode(path);
-    return !!node;
-  }
-
-  private async getNode(path: string): Promise<VFSNode | null> {
-    const normalizedPath = this.normalize(path);
-    if (normalizedPath === 'C:') return { path: 'C:', name: 'C:', type: 'drive', lastModified: 0 };
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/);
-    if (driveMatch) {
-      const letter = driveMatch[1];
-      const subPath = driveMatch[2] || '/';
-      if (letter !== 'C' && this.mounts[letter]) {
-        return this.getMountedNode(letter, subPath);
-      }
-    }
-
-    const transaction = this.db!.transaction(STORE_FILES, 'readonly');
-    const store = transaction.objectStore(STORE_FILES);
-    const request = store.get(normalizedPath);
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  /**
-   * Lists all node children existing at the requested directory.
-   * Automatically resolves root drives if requesting `/` or `C:`.
-   * @param path Folder path to read.
-   * @returns An array of resolved `VFSNode` structures.
-   */
-  async ls(path: string): Promise<VFSNode[]> {
-    await this.init();
-    const normalizedPath = this.normalize(path);
-
-    if (normalizedPath === '' || normalizedPath === '/') {
-      const cLabel = this.mounts['C']?.label || 'Internal Storage';
-      const drives: VFSNode[] = [{ path: 'C:', name: `${cLabel} (C:)`, type: 'drive', lastModified: 0 }];
-      for (const letter of Object.keys(this.mounts)) {
-        if (letter !== 'C') {
-          const mLabel = this.mounts[letter].label || 'Mounted Folder';
-          const status = await this.checkPermission(letter);
-          drives.push({
-            path: `${letter}:`,
-            name: `${mLabel} (${letter}:)`,
-            type: 'drive',
-            lastModified: 0,
-            status: status,
-          });
-        }
-      }
-      return drives;
-    }
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/);
-    if (driveMatch) {
-      const letter = driveMatch[1];
-      const subPath = driveMatch[2] || '/';
-
-      if (letter === 'C') {
-        return this.lsIDB(normalizedPath);
-      } else if (this.mounts[letter]) {
-        return this.lsMounted(letter, subPath);
-      }
-    }
-
-    return [];
-  }
-
-  private async lsIDB(path: string): Promise<VFSNode[]> {
-    const transaction = this.db!.transaction(STORE_FILES, 'readonly');
-    const store = transaction.objectStore(STORE_FILES);
-    const request = store.openCursor();
-    const results: VFSNode[] = [];
-
-    const prefix = path.endsWith('/') ? path : path + '/';
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          const nodePath = cursor.value.path;
-          if (nodePath.startsWith(prefix)) {
-            const relativePart = nodePath.slice(prefix.length);
-            if (!relativePart.includes('/') || (relativePart.endsWith('/') && relativePart.split('/').length <= 2)) {
-              results.push(cursor.value);
-            }
-          }
-          cursor.continue();
-        } else {
-          resolve(results);
-        }
-      };
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  private async lsMounted(letter: string, subPath: string): Promise<VFSNode[]> {
-    const rootHandle = this.mounts[letter].handle;
-    let currentHandle: FileSystemDirectoryHandle = rootHandle;
-
-    const parts = subPath.split('/').filter(Boolean);
-    for (const part of parts) {
-      currentHandle = await currentHandle.getDirectoryHandle(part);
-    }
-
-    const results: VFSNode[] = [];
+  private async migrateLegacyData() {
+    if (typeof indexedDB === 'undefined') return;
 
     try {
-      for await (const entry of (currentHandle as any).values()) {
+      const dbs = await indexedDB.databases();
+      if (!dbs.find(db => db.name === OLD_DB_NAME)) return;
+
+      console.log('VFS: Legacy AmerOS_VFS detected. Starting migration...');
+
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(OLD_DB_NAME);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      const transaction = db.transaction(['files'], 'readonly');
+      const store = transaction.objectStore('files');
+      const request = store.getAll();
+
+      const nodes = await new Promise<any[]>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      for (const node of nodes) {
+        const newPath = node.path.replace(/^C:/, '');
+        if (!newPath || newPath === '/') continue;
+
         try {
-          results.push({
-            path: `${letter}:${subPath === '/' ? '' : subPath}/${entry.name}`,
-            name: entry.name,
-            type: entry.kind === 'directory' ? 'dir' : 'file',
-            lastModified: Date.now(),
-            handle: entry,
-          });
-        } catch (entryErr) {
-          console.error(
-            `VFS: Failed to process entry in ${letter}:${subPath}. This is likely due to illegal Windows filenames (e.g. leading spaces).`,
-            entryErr
-          );
+          if (node.type === 'dir') {
+            if (!fs.existsSync(newPath)) fs.mkdirSync(newPath, { recursive: true });
+          } else {
+            const parentDir = newPath.substring(0, newPath.lastIndexOf('/'));
+            if (parentDir && parentDir !== '' && !fs.existsSync(parentDir)) {
+              fs.mkdirSync(parentDir, { recursive: true });
+            }
+            
+            let content = node.content;
+            if (content instanceof Blob) {
+              content = new Uint8Array(await content.arrayBuffer());
+            }
+            fs.writeFileSync(newPath, content || new Uint8Array());
+          }
+        } catch (err) {
+          console.warn(`VFS: Migration failed for ${node.path}:`, err);
         }
       }
-    } catch (enumErr) {
-      console.error(`VFS: Directory enumeration failed for ${letter}:${subPath}.`, enumErr);
-      throw new Error('Unable to read directory content. Windows may be blocking access to these filenames.');
+
+      db.close();
+      await new Promise<void>((resolve, reject) => {
+        const delReq = indexedDB.deleteDatabase(OLD_DB_NAME);
+        delReq.onsuccess = () => resolve();
+        delReq.onerror = () => reject(delReq.error);
+      });
+
+      console.log('VFS: Legacy migration completed.');
+    } catch (err) {
+      console.error('VFS: Data migration error:', err);
     }
-    return results;
   }
 
-  private async getMountedNode(letter: string, subPath: string): Promise<VFSNode | null> {
-    if (subPath === '/' || subPath === '') {
-      return { path: `${letter}:`, name: `${letter}:`, type: 'dir', lastModified: 0 };
-    }
-
-    const rootHandle = this.mounts[letter].handle;
-    const parts = subPath.split('/').filter(Boolean);
-    const fileName = parts.pop()!;
-    let currentHandle: FileSystemDirectoryHandle = rootHandle;
-
+  private async seedDefaults() {
     try {
-      for (const part of parts) {
-        currentHandle = await currentHandle.getDirectoryHandle(part);
+      // 1. Ensure core system directories exist
+      const coreDirs = ['/home', '/System', SYSTEM_MOUNTS_DIR];
+      for (const dir of coreDirs) {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
       }
+
+      // 2. Seed from manifest
+      for (const folder of defaultVfs.folders) {
+        if (!fs.existsSync(folder)) {
+          fs.mkdirSync(folder, { recursive: true });
+        }
+      }
+
+      for (const file of defaultVfs.files) {
+        const path = '/' + file.relativePath;
+        if (!fs.existsSync(path)) {
+          try {
+            // Check if parent directory exists
+            const parent = path.substring(0, path.lastIndexOf('/'));
+            if (parent && !fs.existsSync(parent)) {
+              fs.mkdirSync(parent, { recursive: true });
+            }
+
+            // Decode base64 content
+            const binaryString = atob(file.contentBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            fs.writeFileSync(path, bytes);
+          } catch (err) {
+            console.warn(`VFS: Failed to seed file ${path}:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('VFS: Seeding failed', err);
+    }
+  }
+
+  private async getHandleStore(mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('AmerOS_MountHandles', 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('handles')) {
+          db.createObjectStore('handles');
+        }
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction('handles', mode);
+        resolve(transaction.objectStore('handles'));
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  private async restoreMounts() {
+    try {
+      if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) {
+        fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
+      }
+
+      // 1. Get handles from IndexedDB
+      const store = await this.getHandleStore();
+      const request = store.getAll();
+      const keysRequest = store.getAllKeys();
+
+      const [handles, names] = await Promise.all([
+        new Promise<FileSystemDirectoryHandle[]>((resolve) => { request.onsuccess = () => resolve(request.result); }),
+        new Promise<string[]>((resolve) => { keysRequest.onsuccess = () => resolve(keysRequest.result as string[]); })
+      ]);
+
+      // 2. Mount each one
+    for (const name of names) {
+      const handle = handles[names.indexOf(name)];
+      const mountPath = `/${name}`;
 
       try {
-        const fileHandle = await currentHandle.getFileHandle(fileName);
-        const fileObj = await fileHandle.getFile();
-        return {
-          path: `${letter}:${subPath}`,
-          name: fileName,
-          type: 'file',
-          lastModified: fileObj.lastModified,
-          handle: fileHandle,
-        };
-      } catch {
-        const dirHandle = await currentHandle.getDirectoryHandle(fileName);
-        return {
-          path: `${letter}:${subPath}`,
-          name: fileName,
-          type: 'dir',
-          lastModified: 0,
-          handle: dirHandle,
-        };
+        const config = await resolveMountConfig({ backend: WebAccess, handle });
+        
+        if (!fs.existsSync(mountPath)) fs.mkdirSync(mountPath, { recursive: true });
+        
+        try {
+          fs.mount(mountPath, config);
+          this.mountPoints.add(name);
+          console.log(`VFS: Restored mount ${mountPath}`);
+        } catch (mountErr) {
+          if (String(mountErr).includes('already in use')) {
+            this.mountPoints.add(name);
+          } else {
+            throw mountErr;
+          }
+        }
+        
+      } catch (err) {
+        console.warn(`VFS: Failed to restore mount ${name}:`, err);
       }
-    } catch {
-      return null;
+    }
+    // Notify root that mounts have been restored
+    this.notifyChange('/');
+
+    } catch (err) {
+      console.warn('VFS: Restore mounts failed:', err);
     }
   }
 
   /**
-   * Reads a file completely into memory.
-   * Resolves IDB nodes entirely into Blob/File references. Native mounts yield raw Native Handles.
-   * @param path Full filepath target.
+   * Lists nodes in a directory.
+   * Special logic for root (/):
+   * - Shows /home as "Home"
+   * - Shows mounts from /mnt directly as if top-level
+   * - Hides /System, /mnt (the parent), and others unless showHidden is true
    */
-  async readFile(path: string): Promise<string | ArrayBuffer | Blob | File> {
+  async ls(path: string, options: LSOptions = { depth: 1 }): Promise<VFSNode[]> {
     await this.init();
-    const node = await this.getNode(path);
-    if (!node) throw new Error('File not found');
+    const normalized = this.normalize(path);
+    const { types = 'all', name = '*', depth = 1, isSearch = false } = options;
+    const nameRegex = this.wildcardToRegex(name);
 
-    if (node.handle && node.type === 'file') {
-      const file = await (node.handle as FileSystemFileHandle).getFile();
-      return file;
-    }
-
-    if (node.type === 'file') {
-      return (node as FileNode).content || '';
-    }
-
-    throw new Error('Not a file');
-  }
-
-  /**
-   * Writes content forcefully into a file node at the designated path.
-   * Valid strings will be inherently converted to `'text/plain'` blobs.
-   * @param path Target filepath to write.
-   * @param content Raw data payload string, Buffer, or Blob.
-   */
-  async writeFile(path: string, content: string | ArrayBuffer | Blob | File) {
-    await this.init();
-    const normalizedPath = this.normalize(path);
-    const name = normalizedPath.split('/').pop()!;
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/);
-    if (driveMatch) {
-      const letter = driveMatch[1];
-      const subPath = driveMatch[2] || '/';
-      if (letter !== 'C' && this.mounts[letter]) {
-        return this.writeExternal(letter, subPath, content);
+    // Root-specific curated view logic (only for depth 1 at '/')
+    if (normalized === '/' && depth === 1 && !isSearch) {
+      const results: VFSNode[] = [];
+      
+      // Home is ALWAYS first
+      if (fs.existsSync('/home')) {
+        results.push(await this.getNodeInfo('/home', 'Home'));
       }
+
+      // Add Mounts
+      for (const mount of this.mountPoints) {
+        const mountPath = `/${mount}`;
+        if (fs.existsSync(mountPath)) {
+          results.push({
+            ...(await this.getNodeInfo(mountPath, mount)),
+            isMountPoint: true
+          });
+        }
+      }
+      return this.filterNodes(results, { types, nameRegex });
     }
 
-    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
-    const store = transaction.objectStore(STORE_FILES);
+    // Standard recursive traversal, skipping internal folders at the root
+    const results: VFSNode[] = [];
+    const walk = async (currPath: string, currDepth: number) => {
+      try {
+        const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
+        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
 
-    let finalContent = content;
-    if (typeof content === 'string') {
-      finalContent = new Blob([content], { type: 'text/plain' });
-    }
+        for (const node of nodes) {
+          const matchesType = types === 'all' || node.type === types;
+          const matchesName = nameRegex.test(node.name);
 
-    const node: VFSNode = {
-      path: normalizedPath,
-      name,
-      type: 'file',
-      content: finalContent,
-      lastModified: Date.now(),
+          // If it matches, add it to results based on search/nested mode
+          if (matchesType && matchesName) {
+            if (isSearch) {
+              results.push(node);
+            } else if (currDepth === depth) {
+              results.push(node);
+            }
+          }
+
+          // Recurse if needed
+          if (node.type === 'dir' && currDepth < depth) {
+            const children = await walk(node.path, currDepth + 1);
+            if (!isSearch && !matchesName && matchesType) {
+                // If we are building a tree and this folder didn't match but we are going deeper? 
+                // Usually ls(depth) means we want the structure.
+            }
+            if (!isSearch) {
+               node.children = children;
+               if (currDepth === depth - 1 && !isSearch) {
+                 // We only add top-level nodes to results in nested mode
+                 if (currPath === normalized) {
+                    results.push(node);
+                 }
+               }
+            }
+          }
+        }
+        return nodes;
+      } catch (err) {
+        return [];
+      }
     };
-    store.put(node);
 
-    return new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
+    // Refined recursive logic for unified ls
+    const recursiveList = async (currPath: string, currDepth: number): Promise<VFSNode[]> => {
+      try {
+        const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
+        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
+        const matchedNodes: VFSNode[] = [];
+
+        for (const node of nodes) {
+          // Explicitly hide system folders from the top level
+          if (currPath === '/' && (node.name === 'System' || node.name === 'mnt')) continue;
+
+          const matchesType = types === 'all' || node.type === types;
+          const matchesName = nameRegex.test(node.name);
+
+          if (node.type === 'dir' && currDepth < depth) {
+            node.children = await recursiveList(node.path, currDepth + 1);
+          }
+
+          if (isSearch) {
+            if (matchesType && matchesName) results.push(node);
+          } else {
+            if (matchesType && matchesName) matchedNodes.push(node);
+          }
+        }
+        return matchedNodes;
+      } catch {
+        return [];
+      }
+    };
+
+    if (isSearch) {
+      await recursiveList(normalized, 1);
+      return results;
+    } else {
+      return await recursiveList(normalized, 1);
+    }
+  }
+
+  private filterNodes(nodes: VFSNode[], criteria: { types: string, nameRegex: RegExp }): VFSNode[] {
+    return nodes.filter(node => {
+      const matchesType = criteria.types === 'all' || node.type === criteria.types;
+      const matchesName = criteria.nameRegex.test(node.name);
+      return matchesType && matchesName;
     });
   }
 
-  private async writeExternal(letter: string, subPath: string, content: any) {
-    const rootHandle = this.mounts[letter].handle;
-    const parts = subPath.split('/').filter(Boolean);
-    const fileName = parts.pop()!;
-    let currentHandle: FileSystemDirectoryHandle = rootHandle;
-
-    for (const part of parts) {
-      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
-    }
-
-    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
-    const writable = await (fileHandle as any).createWritable();
-    await writable.write(content);
-    await writable.close();
+  private wildcardToRegex(pattern: string): RegExp {
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    const regex = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+    return new RegExp(`^${regex}$`, 'i');
   }
 
-  /**
-   * Forces the creation of a Folder Directory strictly.
-   * @param path The full desired path for the new folder.
-   */
+  private formatDirent(parent: string, entry: any): VFSNode {
+    const path = `${parent === '/' ? '' : parent}/${entry.name}`;
+    return {
+      path,
+      name: entry.name,
+      type: entry.isDirectory() ? 'dir' : 'file',
+      lastModified: Date.now(), // Metadata should be fetched lazily if needed
+      isMountPoint: this.isMountPoint(path)
+    };
+  }
+
+  private async getNodeInfo(path: string, alias?: string): Promise<VFSNode> {
+    try {
+      const stats = await fs.promises.stat(path);
+      const name = alias || path.split('/').filter(Boolean).pop() || '/';
+      return {
+        path,
+        name,
+        type: stats.isDirectory() ? 'dir' : 'file',
+        lastModified: stats.mtimeMs,
+        isMountPoint: this.isMountPoint(path)
+      };
+    } catch (err) {
+      return {
+        path,
+        name: alias || path.split('/').filter(Boolean).pop() || 'unknown',
+        type: 'file',
+        lastModified: Date.now(),
+        isMountPoint: this.isMountPoint(path)
+      };
+    }
+  }
+
+  async exists(path: string): Promise<boolean> {
+    await this.init();
+    return fs.existsSync(this.normalize(path));
+  }
+
+  async readFile(path: string): Promise<Blob | string | ArrayBuffer> {
+    await this.init();
+    const data = await fs.promises.readFile(this.normalize(path));
+    return new Blob([data]);
+  }
+
+  async writeFile(path: string, content: string | ArrayBuffer | Blob) {
+    await this.init();
+    let data: Uint8Array | string;
+    if (content instanceof Blob) {
+      data = new Uint8Array(await content.arrayBuffer());
+    } else if (content instanceof ArrayBuffer) {
+      data = new Uint8Array(content);
+    } else {
+      data = content;
+    }
+    await fs.promises.writeFile(this.normalize(path), data);
+    this.notifyChange(path);
+  }
+
   async mkdir(path: string) {
     await this.init();
-    const normalizedPath = this.normalize(path);
-    const name = normalizedPath.split('/').pop()!;
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/);
-    if (driveMatch) {
-      const letter = driveMatch[1];
-      const subPath = driveMatch[2] || '/';
-      if (letter !== 'C' && this.mounts[letter]) {
-        const rootHandle = this.mounts[letter].handle;
-        const parts = subPath.split('/').filter(Boolean);
-        let currentHandle = rootHandle;
-        for (const part of parts) {
-          currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
-        }
-        return;
-      }
-    }
-
-    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
-    const store = transaction.objectStore(STORE_FILES);
-    const node: VFSNode = {
-      path: normalizedPath,
-      name,
-      type: 'dir',
-      lastModified: Date.now(),
-    };
-    store.put(node);
-
-    return new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
+    await fs.promises.mkdir(this.normalize(path), { recursive: true });
+    this.notifyChange(path);
   }
 
   async touch(path: string) {
     await this.init();
-    if (!(await this.exists(path))) {
-      await this.writeFile(path, new Blob([], { type: 'application/octet-stream' }));
+    const normalized = this.normalize(path);
+    try {
+      await fs.promises.stat(normalized);
+    } catch {
+      await fs.promises.writeFile(normalized, new Uint8Array());
+      this.notifyChange(normalized);
     }
   }
 
-  /**
-   * Scans and fully deletes a node and all of its nested children automatically.
-   * Recursive behavior is executed if the targeted path is verified as a Directory.
-   * @param path Path string mapping the desired entity to erase.
-   */
   async delete(path: string) {
     await this.init();
-    const normalizedPath = this.normalize(path);
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):(.*)/);
-    if (driveMatch) {
-      const letter = driveMatch[1];
-      const subPath = driveMatch[2] || '/';
-      if (letter !== 'C' && this.mounts[letter]) {
-        return this.deleteExternal(letter, subPath);
-      }
-    }
-
-    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
-    const store = transaction.objectStore(STORE_FILES);
-
-    const prefix = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/';
-    const request = store.openCursor();
-
-    return new Promise<void>((resolve, reject) => {
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          const nodePath = cursor.value.path;
-          if (nodePath === normalizedPath || nodePath.startsWith(prefix)) {
-            cursor.delete();
-          }
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      request.onerror = () => reject(request.error);
-    });
+    await fs.promises.rm(this.normalize(path), { recursive: true, force: true });
+    this.notifyChange(path);
   }
 
-  private async deleteExternal(letter: string, subPath: string) {
-    const rootHandle = this.mounts[letter].handle;
-    if (subPath === '/' || subPath === '') throw new Error('Cannot delete drive root');
-
-    const parts = subPath.split('/').filter(Boolean);
-    const name = parts.pop()!;
-    let currentHandle = rootHandle;
-    for (const part of parts) {
-      currentHandle = await currentHandle.getDirectoryHandle(part);
-    }
-
-    await (currentHandle as any).removeEntry(name, { recursive: true });
-  }
-
-  /**
-   * Reassigns the name identity of a specific target node or folder.
-   * @param path Target path pointing to the entity.
-   * @param newName Flat filename target mapping (Does not execute directory migration).
-   */
   async rename(path: string, newName: string) {
     await this.init();
-    const normalizedPath = this.normalize(path);
-
-    const driveMatch = normalizedPath.match(/^([A-Z]):$/);
-    if (driveMatch) {
-      await this.setVolumeLabel(driveMatch[1], newName);
-      return;
-    }
-
-    const node = await this.getNode(normalizedPath);
-    if (!node) throw new Error('Source not found');
-
-    const lastSlash = normalizedPath.lastIndexOf('/');
-    const parentPath = normalizedPath.substring(0, lastSlash) || (normalizedPath.includes(':') ? normalizedPath.split(':')[0] + ':' : '/');
-    const newPath = this.normalize(`${parentPath}/${newName}`);
-
-    if (node.handle) {
-      if (node.type === 'file') {
-        if ((node.handle as any).move) {
-          await (node.handle as any).move(newName);
-          return;
-        }
-      } else {
-        await this.copy(normalizedPath, newPath);
-        await this.delete(normalizedPath);
-        return;
-      }
-      throw new Error('Native rename not supported for this handle');
-    }
-
-    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
-    const store = transaction.objectStore(STORE_FILES);
-    const prefix = normalizedPath + '/';
-    const nodesToUpdate: { oldPath: string; newNode: VFSNode }[] = [];
-
-    const cursorRequest = store.openCursor();
-    await new Promise<void>((resolve, reject) => {
-      cursorRequest.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          const oldChildPath = cursor.value.path;
-          if (oldChildPath === normalizedPath) {
-            nodesToUpdate.push({ oldPath: oldChildPath, newNode: { ...cursor.value, path: newPath, name: newName } });
-          } else if (oldChildPath.startsWith(prefix)) {
-            const relative = oldChildPath.slice(prefix.length);
-            const newChildPath = newPath + '/' + relative;
-            nodesToUpdate.push({ oldPath: oldChildPath, newNode: { ...cursor.value, path: newChildPath } });
-          }
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      cursorRequest.onerror = () => reject(cursorRequest.error);
-    });
-
-    for (const update of nodesToUpdate) {
-      await store.delete(update.oldPath);
-      await store.put(update.newNode);
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
+    const normalized = this.normalize(path);
+    const parent = normalized.substring(0, normalized.lastIndexOf('/')) || '/';
+    const newPath = this.normalize(`${parent}/${newName}`);
+    await fs.promises.rename(normalized, newPath);
+    this.notifyChange(path);
+    this.notifyChange(newPath);
   }
 
-  /**
-   * Recursively copies a target entity and all its nested branches effectively to a new path.
-   * IDB instances and Native handles resolve correctly between memory barriers.
-   * @param src Target Path mapping the identity to clone.
-   * @param dest The resulting absolute Path boundary structure containing exactly where it drops.
-   */
   async copy(src: string, dest: string) {
     await this.init();
-    const srcNode = await this.getNode(src);
-    if (!srcNode) throw new Error('Source not found');
+    const srcNorm = this.normalize(src);
+    const destNorm = this.normalize(dest);
+    const stats = await fs.promises.stat(srcNorm);
 
-    if (srcNode.type === 'dir') {
-      await this.mkdir(dest);
-      const children = await this.ls(src);
-      for (const child of children) {
-        await this.copy(child.path, `${dest}/${child.name}`);
+    if (stats.isDirectory()) {
+      if (!(await this.exists(destNorm))) await fs.promises.mkdir(destNorm, { recursive: true });
+      const entries = await fs.promises.readdir(srcNorm);
+      for (const entry of entries) {
+        await this.copy(`${srcNorm}/${entry}`, `${destNorm}/${entry}`);
       }
-      return;
+    } else {
+      await fs.promises.copyFile(srcNorm, destNorm);
     }
-
-    const content = await this.readFile(src);
-    await this.writeFile(dest, content);
+    this.notifyChange(dest);
   }
 
-  /**
-   * Copies the targeted Source completely to the given Dest and then permanently erases the original instance cleanly.
-   * Optimizes internally yielding Native `move` APIs when transferring directly within equivalent external File System mounted letters.
-   */
   async move(src: string, dest: string) {
     await this.init();
-    const srcDrive = src.split(':')[0];
-    const destDrive = dest.split(':')[0];
-    const srcNode = await this.getNode(src);
-    if (!srcNode) throw new Error('Source not found');
-
-    if (srcDrive === destDrive && srcNode.handle) {
-      const newName = dest.split('/').pop()!;
-      const destParentPath = dest.substring(0, dest.lastIndexOf('/')) || (dest.includes(':') ? dest.split(':')[0] + ':' : '/');
-      const destParentNode = await this.getNode(destParentPath);
-
-      if (srcNode.type === 'file' && (srcNode.handle as any).move && destParentNode?.handle) {
-        await (srcNode.handle as any).move(destParentNode.handle, newName);
-        return;
-      }
-      await this.copy(src, dest);
-      await this.delete(src);
-      return;
-    }
-
-    await this.copy(src, dest);
-    await this.delete(src);
+    await fs.promises.rename(this.normalize(src), this.normalize(dest));
+    this.notifyChange(src);
+    this.notifyChange(dest);
   }
 
-  /**
-   * Traverses a path and safely recursively calculates byte size weights for files or huge folder structures.
-   */
-  async getSize(path: string): Promise<number> {
+  async getSize(path: string, maxDepth = 3): Promise<number> {
     await this.init();
-    const node = await this.getNode(path);
-    if (!node) return 0;
+    const normalized = this.normalize(path);
+    try {
+      const stats = await fs.promises.stat(normalized);
+      if (stats.isFile()) return stats.size;
 
-    if (node.type === 'file') {
-      if (node.handle) {
-        const file = await (node.handle as FileSystemFileHandle).getFile();
-        return file.size;
+      if (maxDepth <= 0) return 0;
+
+      let total = 0;
+      const entries = await fs.promises.readdir(normalized);
+      for (const entry of entries) {
+        total += await this.getSize(`${normalized}/${entry}`, maxDepth - 1);
       }
-      if (node.content instanceof Blob || node.content instanceof File) return node.content.size;
-      if (node.content instanceof ArrayBuffer) return node.content.byteLength;
-      return ((node.content as string) || '').length;
+      return total;
+    } catch (err) {
+      return 0;
     }
-
-    const children = await this.ls(path);
-    let total = 0;
-    for (const child of children) {
-      total += await this.getSize(child.path);
-    }
-    return total;
   }
 
-  /**
-   * Fetches advanced security layout and byte structure characteristics of a path.
-   * Also negotiates read/write permission statuses.
-   */
   async getProperties(path: string): Promise<VFSProperties> {
     await this.init();
-    const node = await this.getNode(path);
-    if (!node) throw new Error('Not found');
-
-    const size = await this.getSize(path);
-    let readOnly = false;
-
-    if (node.handle) {
-      const mode = 'readwrite' as FileSystemPermissionMode;
-      const status = await (node.handle as any).queryPermission({ mode });
-      readOnly = status !== 'granted';
-    }
-
+    const normalized = this.normalize(path);
+    const stats = await fs.promises.stat(normalized);
     return {
-      size,
-      lastModified: node.lastModified,
-      type: node.type,
-      readOnly,
-      path: node.path,
+      size: await this.getSize(normalized),
+      lastModified: stats.mtimeMs,
+      type: stats.isDirectory() ? 'dir' : 'file',
+      readOnly: false,
+      path: normalized
     };
   }
 
-  async setVolumeLabel(letter: string, label: string) {
-    await this.init();
-    if (letter === 'C') {
-      const transaction = this.db!.transaction(STORE_MOUNTS, 'readwrite');
-      const store = transaction.objectStore(STORE_MOUNTS);
-      store.put({ letter: 'C', handle: null as any, label });
-      this.mounts['C'] = { letter: 'C', handle: null as any, label };
-      return;
-    }
-
-    if (!this.mounts[letter]) return;
-    this.mounts[letter].label = label;
-    const transaction = this.db!.transaction(STORE_MOUNTS, 'readwrite');
-    const store = transaction.objectStore(STORE_MOUNTS);
-    store.put(this.mounts[letter]);
-  }
-
-  async getVolumeLabel(letter: string): Promise<string> {
-    await this.init();
-    return this.mounts[letter]?.label || (letter === 'C' ? 'Local Disk' : 'Removable Disk');
-  }
-
-  /**
-   * Creates a dedicated external memory Volume mapped exactly natively over a user chosen File System Access OS Handle.
-   * Assigns sequential distinct drive mapping assignments (D:, E:, F:, G:, etc.) automatically natively.
-   */
   async mountFolder(handle: FileSystemDirectoryHandle): Promise<string> {
     await this.init();
-    const letters = 'DEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const usedLetters = Object.keys(this.mounts);
-    const nextLetter = letters.find((l) => !usedLetters.includes(l));
+    const name = this.getUniqueMountName(handle.name);
+    const mountPath = `/${name}`;
 
-    if (!nextLetter) throw new Error('No available drive letters');
-
-    const mount: VFSMount = { letter: nextLetter, handle, label: handle.name };
-    this.mounts[nextLetter] = mount;
-
-    const transaction = this.db!.transaction(STORE_MOUNTS, 'readwrite');
-    const store = transaction.objectStore(STORE_MOUNTS);
-    store.put(mount);
-
-    return new Promise<string>((resolve, reject) => {
-      transaction.oncomplete = () => resolve(nextLetter);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-
-  /**
-   * Destroys an existing mounted external hardware connection dropping its state explicitly.
-   * System effectively blocks the 'C' internal letter dynamically explicitly.
-   */
-  async unmountFolder(letter: string): Promise<void> {
-    await this.init();
-    if (letter === 'C') throw new Error('Cannot unmount boot drive');
-    if (!this.mounts[letter]) return;
-
-    delete this.mounts[letter];
-    const transaction = this.db!.transaction(STORE_MOUNTS, 'readwrite');
-    const store = transaction.objectStore(STORE_MOUNTS);
-    store.delete(letter);
-
-    return new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-
-  async factoryReset() {
-    if (this.db) {
-      this.db.close();
-      this.db = null;
+    // 1. Check if already mounted (should be handled by getUniqueMountName, but for safety)
+    if (this.mountPoints.has(name)) {
+      console.log(`VFS: ${name} is already mounted, skipping.`);
+      return name;
     }
 
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(DB_NAME);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => console.warn('VFS factory reset blocked by open connections');
-    });
+    // 2. Create mount point if it doesn't exist
+    if (!fs.existsSync(mountPath)) {
+      try {
+        fs.mkdirSync(mountPath, { recursive: true });
+      } catch (err) {
+        console.warn(`VFS: Failed to create mount point ${mountPath}:`, err);
+      }
+    }
 
-    window.location.reload();
+    // 3. Mount in ZenFS
+    try {
+      const config = await resolveMountConfig({ backend: WebAccess, handle });
+      fs.mount(mountPath, config);
+    } catch (err) {
+      console.error(`VFS: Failed to mount ${name}:`, err);
+      throw new Error(`Failed to mount folder: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // 4. Store handle in IndexedDB for persistence
+    try {
+      const store = await this.getHandleStore('readwrite');
+      store.put(handle, name);
+    } catch (err) {
+      console.warn('VFS: Failed to persist mount handle:', err);
+    }
+
+    // 5. Store metadata for legacy support
+    try {
+      if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
+      fs.writeFileSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`, JSON.stringify({ name, path: mountPath }));
+    } catch (err) {
+       console.warn('VFS: Failed to write mount metadata:', err);
+    }
+
+    this.mountPoints.add(name);
+    this.notifyChange('/');
+    return name;
+  }
+
+  async unmountFolder(name: string) {
+    await this.init();
+    const mountPath = `/${name}`;
+    
+    try {
+      fs.umount(mountPath);
+    } catch (err) {
+      console.warn(`VFS: Failed to unmount ${mountPath}:`, err);
+    }
+
+    // Remove handle from IndexedDB
+    try {
+      const store = await this.getHandleStore('readwrite');
+      store.delete(name);
+    } catch (err) {
+      console.warn('VFS: Failed to remove persisted handle:', err);
+    }
+
+    if (fs.existsSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`)) {
+      try { fs.rmSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`); } catch {}
+    }
+    this.mountPoints.delete(name);
+    this.notifyChange('/');
   }
 
   async getMounts() {
     await this.init();
-    return Object.keys(this.mounts).map((letter) => this.mounts[letter]);
+    return Array.from(this.mountPoints).map(name => ({
+      letter: name, 
+      name: name,
+      path: `/${name}`
+    }));
   }
 
-  async checkPermission(letter: string): Promise<'granted' | 'denied' | 'prompt'> {
-    await this.init();
-    if (letter === 'C') return 'granted';
-    const mount = this.mounts[letter];
-    if (!mount) return 'denied';
+  private getUniqueMountName(name: string): string {
+    const reserved = ['home', 'System', 'mnt', 'System/mnt'];
+    let finalName = name;
+    let counter = 1;
 
-    try {
-      return await (mount.handle as any).queryPermission({ mode: 'readwrite' });
-    } catch (err) {
-      console.error(`VFS: Failed to query permission for ${letter}:`, err);
-      return 'prompt';
-    }
-  }
+    const isTaken = (n: string) => 
+      this.mountPoints.has(n) || 
+      reserved.some(r => r.toLowerCase() === n.toLowerCase()) ||
+      fs.existsSync(`/${n}`);
 
-  async requestPermission(letter: string): Promise<boolean> {
-    await this.init();
-    if (letter === 'C') return true;
-    const mount = this.mounts[letter];
-    if (!mount) return false;
-
-    try {
-      const status = await (mount.handle as any).requestPermission({ mode: 'readwrite' });
-      return status === 'granted';
-    } catch (err) {
-      console.error(`VFS: Failed to request permission for ${letter}:`, err);
-      return false;
-    }
-  }
-
-  async getTree(): Promise<FolderTreeNode[]> {
-    await this.init();
-    const rootItems = await this.ls('/');
-    const drives = rootItems.filter((item) => item.type === 'drive') as DriveNode[];
-
-    const tree: FolderTreeNode[] = [];
-
-    for (const drive of drives) {
-      const permission = await this.checkPermission(drive.path[0]);
-      let children: FolderTreeNode[] | undefined;
-
-      if (permission === 'granted') {
-        try {
-          children = await this.getSubTree(drive.path);
-        } catch (err) {
-          console.warn(`Failed to get subtree for ${drive.path}:`, err);
-          children = [];
-        }
-      } else {
-        children = [];
-        drive.status = permission;
-      }
-
-      const driveNode: FolderTreeNode = {
-        ...drive,
-        children,
-      };
-      tree.push(driveNode);
+    while (isTaken(finalName)) {
+      counter++;
+      finalName = `${name}-${counter}`;
     }
 
-    return tree;
+    return finalName;
   }
 
-  private async getSubTree(path: string): Promise<FolderTreeNode[]> {
-    try {
-      const items = await this.ls(path);
-      const folders = items.filter((item) => item.type === 'dir') as FolderNode[];
-
-      const children: FolderTreeNode[] = [];
-      for (const folder of folders) {
-        const child: FolderTreeNode = {
-          ...folder,
-          children: await this.getSubTree(folder.path),
-        };
-        children.push(child);
-      }
-
-      return children;
-    } catch (err) {
-      console.warn(`Failed to get subtree for ${path}:`, err);
-      return [];
-    }
+  async checkPermission(name: string): Promise<'granted' | 'denied' | 'prompt'> {
+    return 'granted';
   }
 
-  /**
-   * Exports all files on C: drive as a ZIP blob, excluding specified paths.
-   * Uses @zip.js/zip.js for browser-native ZIP creation.
-   */
+  async requestPermission(name: string): Promise<boolean> {
+    return true;
+  }
+
+  // Deprecated methods replaced by unified ls()
+
   async exportStorage(excludePaths: string[] = []): Promise<Blob> {
     await this.init();
-    const { BlobWriter, ZipWriter } = await import('@zip.js/zip.js');
-
-    const normalizedExcludes = excludePaths.map((p) => this.normalize(p));
-    const allNodes = await this.getAllIDBNodes();
-
+    const { BlobWriter, ZipWriter, BlobReader } = await import('@zip.js/zip.js');
     const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
 
-    for (const node of allNodes) {
-      // Skip excluded paths
-      if (normalizedExcludes.some((ep) => node.path === ep || node.path.startsWith(ep + '/'))) {
-        continue;
-      }
+    const walk = async (dir: string) => {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        const fullPath = this.normalize(`${dir === '/' ? '' : dir}/${entry}`);
+        if (excludePaths.some(p => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + '/'))) continue;
 
-      // Only export C: drive internal files
-      if (!node.path.startsWith('C:')) continue;
-
-      // Strip the C:/ prefix for the zip entry name
-      const entryName = node.path.slice(3); // removes "C:/"
-
-      if (node.type === 'dir') {
-        await zipWriter.add(entryName + '/', new (await import('@zip.js/zip.js')).BlobReader(new Blob([])), { directory: true });
-      } else if (node.type === 'file') {
-        let blob: Blob;
-        if (node.content instanceof Blob || node.content instanceof File) {
-          blob = node.content;
-        } else if (node.content instanceof ArrayBuffer) {
-          blob = new Blob([node.content]);
-        } else if (typeof node.content === 'string') {
-          blob = new Blob([node.content], { type: 'text/plain' });
+        const stats = fs.statSync(fullPath);
+        if (stats.isDirectory()) {
+          await zipWriter.add(entry + '/', new BlobReader(new Blob([])), { directory: true });
+          await walk(fullPath);
         } else {
-          blob = new Blob([]);
+          const data = fs.readFileSync(fullPath);
+          await zipWriter.add(entry, new BlobReader(new Blob([data])));
         }
-        await zipWriter.add(entryName, new (await import('@zip.js/zip.js')).BlobReader(blob));
       }
-    }
+    };
 
+    await walk('/');
     return await zipWriter.close();
   }
 
-  /**
-   * Imports storage from a ZIP blob, writing entries as files/dirs into C: drive IDB.
-   */
-  async importStorage(zipBlob: Blob): Promise<void> {
+  async importStorage(zipBlob: Blob) {
     await this.init();
-    const { BlobReader, ZipReader } = await import('@zip.js/zip.js');
-
+    const { ZipReader, BlobReader, Uint8ArrayWriter } = await import('@zip.js/zip.js');
     const zipReader = new ZipReader(new BlobReader(zipBlob));
     const entries = await zipReader.getEntries();
 
     for (const entry of entries) {
-      const fullPath = 'C:/' + entry.filename.replace(/\/$/, '');
-      if (!fullPath || fullPath === 'C:') continue;
-
+      const path = '/' + entry.filename.replace(/\/$/, '');
       if (entry.directory) {
-        await this.mkdir(fullPath);
+        if (!fs.existsSync(path)) fs.mkdirSync(path, { recursive: true });
       } else {
-        // Ensure parent dir exists
-        const parentPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
-        if (parentPath && parentPath !== 'C:') {
-          const parentExists = await this.exists(parentPath);
-          if (!parentExists) await this.mkdir(parentPath);
-        }
-
-        if (entry.getData) {
-          const { BlobWriter } = await import('@zip.js/zip.js');
-          const blob = await entry.getData(new BlobWriter());
-          await this.writeFile(fullPath, blob);
-        }
+        const data = await entry.getData!(new Uint8ArrayWriter());
+        const parent = path.substring(0, path.lastIndexOf('/'));
+        if (parent && !fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+        fs.writeFileSync(path, data);
       }
     }
-
     await zipReader.close();
+    this.notifyChange('/');
   }
 
-  /**
-   * Clears all files on C: drive except excluded paths.
-   * Does NOT delete the IDB database or mounts—only file entries.
-   */
-  async clearStorage(excludePaths: string[] = []): Promise<void> {
+  async clearStorage(excludePaths: string[] = []) {
     await this.init();
-    const normalizedExcludes = excludePaths.map((p) => this.normalize(p));
+    const walk = (dir: string) => {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        const fullPath = this.normalize(`${dir === '/' ? '' : dir}/${entry}`);
+        if (excludePaths.some(p => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + '/'))) continue;
 
-    const transaction = this.db!.transaction(STORE_FILES, 'readwrite');
-    const store = transaction.objectStore(STORE_FILES);
-    const request = store.openCursor();
-
-    return new Promise<void>((resolve, reject) => {
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          const nodePath: string = cursor.value.path;
-          // Only clear C: drive entries
-          if (nodePath.startsWith('C:')) {
-            const isExcluded = normalizedExcludes.some(
-              (ep) => nodePath === ep || nodePath.startsWith(ep + '/')
-            );
-            if (!isExcluded) {
-              cursor.delete();
-            }
-          }
-          cursor.continue();
+        const stats = fs.statSync(fullPath);
+        if (stats.isDirectory()) {
+          walk(fullPath);
+          try {
+            if (fs.readdirSync(fullPath).length === 0) fs.rmdirSync(fullPath);
+          } catch {}
         } else {
-          resolve();
+          fs.rmSync(fullPath);
         }
-      };
-      request.onerror = () => reject(request.error);
-    });
+      }
+    };
+    walk('/');
+    this.notifyChange('/');
   }
 
-  /**
-   * Returns all raw IDB node records for the files store.
-   */
-  private async getAllIDBNodes(): Promise<any[]> {
-    const transaction = this.db!.transaction(STORE_FILES, 'readonly');
-    const store = transaction.objectStore(STORE_FILES);
-    const request = store.getAll();
+  async factoryReset() {
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        // @ts-ignore
+        for await (const name of root.keys()) {
+          await root.removeEntry(name, { recursive: true });
+        }
+      } catch {}
+    }
+    
+    if (typeof indexedDB !== 'undefined') {
+      try {
+        const dbs = await indexedDB.databases();
+        for (const db of dbs) {
+          if (db.name) indexedDB.deleteDatabase(db.name);
+        }
+      } catch {}
+    }
 
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    window.location.reload();
+  }
+
+  isMountPoint(path: string): boolean {
+    const normalized = this.normalize(path);
+    const parts = normalized.split('/').filter(Boolean);
+    const name = parts[0];
+    
+    return parts.length === 1 && 
+           name !== 'home' && 
+           name !== 'System' && 
+           this.mountPoints.has(name);
+  }
+
+  getVolumeLabel(name: string): string {
+    return name;
   }
 
   private normalize(path: string): string {
     let p = path.replace(/\\/g, '/');
-    if (p.endsWith('/') && p.length > 3) p = p.slice(0, -1);
-    if (p === '/' || p === '') return '/';
+    if (p.startsWith('C:')) p = p.slice(2);
+    if (!p.startsWith('/')) p = '/' + p;
+    if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
     return p;
+  }
+
+  private notifyChange(path: string) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vfs-change', { detail: { path } }));
+    }
   }
 }
 
-/**
- * System-wide Singleton instance of the Virtual File System.
- * Expected to be `.init()`'d specifically during the Hardware sequence in `boot-sequencer.ts`.
- */
 export const vfs = new VFS();

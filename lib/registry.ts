@@ -42,8 +42,8 @@ export type RegistryNode = RegistryKeyNode | RegistryValueNode;
 class Registry {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
-  private readonly SYSTEM_DIR = "C:/Windows/System32/config";
-  private readonly HIVE_PATH = "C:/Windows/System32/config/SYSTEM.reg";
+  private readonly SYSTEM_DIR = "/System/config";
+  private readonly HIVE_PATH = "/System/config/SYSTEM.reg";
 
   async init() {
     if (this.isInitialized) return;

@@ -55,7 +55,7 @@ function getMimeType(fileName) {
       const dir = normalized.includes('/') ? normalized.substring(0, normalized.lastIndexOf('/')) : '';
       if (dir) {
         const parts = dir.split('/');
-        let current = 'C:';
+        let current = '';
         for (const segment of parts) {
           current += `/${segment}`;
           folders.add(current);
@@ -66,7 +66,7 @@ function getMimeType(fileName) {
 
     const parts = normalized.split('/');
     const parentParts = parts.slice(0, -1);
-    let current = 'C:';
+    let current = '';
     for (const segment of parentParts) {
       current += `/${segment}`;
       folders.add(current);
@@ -88,7 +88,6 @@ function getMimeType(fileName) {
   const manifest = {
     folders: Array.from(folders).sort(),
     files,
-    mounts: [{ letter: 'C', handle: null, label: 'AmerOS Boot' }],
   };
 
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
