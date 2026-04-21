@@ -23,6 +23,7 @@ export interface TreeViewProps<TItem> {
   getStatusIcon?: (item: TItem) => ReactNode | null;
   onSelect?: (item: TItem) => void;
   onOpen?: (item: TItem) => void;
+  onToggle?: (item: TItem, expanded: boolean) => void;
   onContextMenu?: (e: MouseEvent<HTMLDivElement>, item: TItem | null) => void;
   onRetry?: () => void;
 }
@@ -40,6 +41,7 @@ export function TreeView<TItem extends TreeNode>({
   getStatusIcon,
   onSelect,
   onOpen,
+  onToggle,
   onContextMenu,
   onRetry,
 }: TreeViewProps<TItem>) {
@@ -95,14 +97,17 @@ export function TreeView<TItem extends TreeNode>({
     });
   }, [selectedKey]);
 
-  const toggleExpand = (key: string) => {
+  const toggleExpand = (item: TItem) => {
+    const key = getKey(item);
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
+      const isCurrentlyExpanded = next.has(key);
+      if (isCurrentlyExpanded) {
         next.delete(key);
       } else {
         next.add(key);
       }
+      onToggle?.(item, !isCurrentlyExpanded);
       return next;
     });
   };
@@ -137,7 +142,7 @@ export function TreeView<TItem extends TreeNode>({
             onClick={(e) => {
               e.stopPropagation();
               if (hasChildren) {
-                toggleExpand(key);
+                toggleExpand(item);
               }
             }}
           >

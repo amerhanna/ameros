@@ -15,6 +15,7 @@ interface FolderTreeViewProps {
   selectedPath?: string | null;
   onOpen: (item: FolderTreeNode) => void;
   onSelect?: (item: FolderTreeNode) => void;
+  onToggle?: (item: FolderTreeNode, expanded: boolean) => void;
   onContextMenu?: (e: MouseEvent<HTMLDivElement>, item: FolderTreeNode | null) => void;
   onRetry?: () => void;
 }
@@ -56,6 +57,7 @@ export function FolderTreeView({
   selectedPath,
   onOpen,
   onSelect,
+  onToggle,
   onContextMenu,
   onRetry,
 }: FolderTreeViewProps) {
@@ -73,6 +75,7 @@ export function FolderTreeView({
       getStatusIcon={getStatusIcon}
       onSelect={onSelect}
       onOpen={onOpen}
+      onToggle={onToggle}
       onContextMenu={onContextMenu}
       onRetry={onRetry}
     />

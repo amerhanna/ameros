@@ -80,6 +80,19 @@ export default function FileExplorer() {
     loadTreeItems();
   }, [loadTreeItems]);
 
+  useEffect(() => {
+    const handleVfsChange = (e: any) => {
+      const { path } = e.detail;
+      if (path === '/' || path === currentPath || currentPath.startsWith(path)) {
+        loadFolderItems();
+        loadTreeItems();
+      }
+    };
+
+    window.addEventListener('vfs-change', handleVfsChange);
+    return () => window.removeEventListener('vfs-change', handleVfsChange);
+  }, [currentPath, loadFolderItems, loadTreeItems]);
+
   const handleOpen = async (node: VFSNode) => {
     if (node.status === 'prompt') {
       const letter = node.path.split(':')[0];
@@ -183,6 +196,30 @@ export default function FileExplorer() {
   const handlePathChange = (path: string) => {
     navigateTo(path);
   };
+
+  const handleToggle = useCallback(async (item: VFSNode, expanded: boolean) => {
+    if (expanded && (!item.children || item.children.length === 0)) {
+      try {
+        const children = await vfs.getChildren(item.path);
+        setTreeData((prev) => {
+          const updateNodes = (nodes: VFSNode[]): VFSNode[] => {
+            return nodes.map((node) => {
+              if (node.path === item.path) {
+                return { ...node, children };
+              }
+              if (node.children) {
+                return { ...node, children: updateNodes(node.children) };
+              }
+              return node;
+            });
+          };
+          return updateNodes(prev);
+        });
+      } catch (err) {
+        toast.error('Failed to load subdirectories');
+      }
+    }
+  }, []);
 
   // --- Context Menu Actions ---
 
@@ -403,6 +440,7 @@ export default function FileExplorer() {
               selectedPath={currentPath}
               onOpen={handleOpen}
               onSelect={handleOpen}
+              onToggle={handleToggle}
               onContextMenu={() => {}}
               onRetry={() => loadTreeItems()}
             />

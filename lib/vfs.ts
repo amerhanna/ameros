@@ -93,8 +93,8 @@ class VFS {
       // 4. Data Migration (Optional)
       await this.migrateLegacyData();
  
-      // 5. Load saved mounts
-      await this.restoreMounts();
+      // 5. Load saved mounts (Background - Non-blocking)
+      this.restoreMounts().catch(err => console.warn('VFS: Background mount restoration failed', err));
 
       console.log('VFS: ZenFS initialized at root (/)');
     })();
@@ -243,26 +243,36 @@ class VFS {
       ]);
 
       // 2. Mount each one
-      for (let i = 0; i < names.length; i++) {
-        const name = names[i];
-        const handle = handles[i];
-        const mountPath = `/mnt/${name}`;
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const handle = handles[i];
+      const mountPath = `/mnt/${name}`;
 
+      try {
+        const config = await resolveMountConfig({ backend: WebAccess, handle });
+        
+        if (!fs.existsSync(mountPath)) fs.mkdirSync(mountPath, { recursive: true });
+        
         try {
-          // Verify permission (may prompt user or remain in 'prompt' state)
-          // We don't await here because it might block if the user needs to interact
-          // but ZenFS needs to be configured.
-          const config = await resolveMountConfig({ backend: WebAccess, handle });
-          
-          if (!fs.existsSync(mountPath)) fs.mkdirSync(mountPath, { recursive: true });
           fs.mount(mountPath, config);
-          
           this.mountPoints.add(name);
           console.log(`VFS: Restored mount ${mountPath}`);
-        } catch (err) {
-          console.warn(`VFS: Failed to restore mount ${name}:`, err);
+        } catch (mountErr) {
+          // If already mounted, skip
+          if (String(mountErr).includes('already in use')) {
+            this.mountPoints.add(name);
+          } else {
+            throw mountErr;
+          }
         }
+        
+      } catch (err) {
+        console.warn(`VFS: Failed to restore mount ${name}:`, err);
       }
+    }
+    // Notify root that mounts have been restored
+    this.notifyChange('/');
+
     } catch (err) {
       console.warn('VFS: Restore mounts failed:', err);
     }
@@ -284,7 +294,7 @@ class VFS {
       
       // Add Home
       if (fs.existsSync('/home')) {
-        results.push(this.getNodeInfo('/home', 'Home'));
+        results.push(await this.getNodeInfo('/home', 'Home'));
       }
 
       // Add Mounts directly to root view
@@ -292,18 +302,17 @@ class VFS {
         const mountPath = `/mnt/${mount}`;
         if (fs.existsSync(mountPath)) {
           results.push({
-            ...this.getNodeInfo(mountPath, mount),
+            ...(await this.getNodeInfo(mountPath, mount)),
             isMountPoint: true
           });
         }
       }
 
-      // Add others if showHidden
       if (showHidden) {
-        const all = fs.readdirSync('/');
-        for (const entry of all) {
-          if (entry === 'home' || entry === 'mnt') continue;
-          results.push(this.getNodeInfo(`/${entry}`));
+        const entries = await fs.promises.readdir('/', { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.name === 'home' || entry.name === 'mnt') continue;
+          results.push(this.formatDirent('/', entry));
         }
       }
 
@@ -311,17 +320,28 @@ class VFS {
     }
 
     try {
-      const entries = fs.readdirSync(normalized);
-      return entries.map(name => this.getNodeInfo(`${normalized}/${name}`));
+      const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
+      return entries.map(entry => this.formatDirent(normalized, entry));
     } catch (err) {
       console.error(`VFS: ls failed for ${normalized}:`, err);
       return [];
     }
   }
 
-  private getNodeInfo(path: string, alias?: string): VFSNode {
+  private formatDirent(parent: string, entry: any): VFSNode {
+    const path = `${parent === '/' ? '' : parent}/${entry.name}`;
+    return {
+      path,
+      name: entry.name,
+      type: entry.isDirectory() ? 'dir' : 'file',
+      lastModified: Date.now(), // Metadata should be fetched lazily if needed
+      isMountPoint: path.startsWith('/mnt/') && path.split('/').filter(Boolean).length === 2
+    };
+  }
+
+  private async getNodeInfo(path: string, alias?: string): Promise<VFSNode> {
     try {
-      const stats = fs.statSync(path);
+      const stats = await fs.promises.stat(path);
       const name = alias || path.split('/').filter(Boolean).pop() || '/';
       return {
         path,
@@ -331,7 +351,6 @@ class VFS {
         isMountPoint: path.startsWith('/mnt/') && path.split('/').filter(Boolean).length === 2
       };
     } catch (err) {
-      // Fallback for missing/inaccessible nodes
       return {
         path,
         name: alias || path.split('/').filter(Boolean).pop() || 'unknown',
@@ -348,7 +367,7 @@ class VFS {
 
   async readFile(path: string): Promise<Blob | string | ArrayBuffer> {
     await this.init();
-    const data = fs.readFileSync(this.normalize(path));
+    const data = await fs.promises.readFile(this.normalize(path));
     return new Blob([data]);
   }
 
@@ -362,28 +381,30 @@ class VFS {
     } else {
       data = content;
     }
-    fs.writeFileSync(this.normalize(path), data);
+    await fs.promises.writeFile(this.normalize(path), data);
     this.notifyChange(path);
   }
 
   async mkdir(path: string) {
     await this.init();
-    fs.mkdirSync(this.normalize(path), { recursive: true });
+    await fs.promises.mkdir(this.normalize(path), { recursive: true });
     this.notifyChange(path);
   }
 
   async touch(path: string) {
     await this.init();
     const normalized = this.normalize(path);
-    if (!fs.existsSync(normalized)) {
-      fs.writeFileSync(normalized, new Uint8Array());
+    try {
+      await fs.promises.stat(normalized);
+    } catch {
+      await fs.promises.writeFile(normalized, new Uint8Array());
       this.notifyChange(normalized);
     }
   }
 
   async delete(path: string) {
     await this.init();
-    fs.rmSync(this.normalize(path), { recursive: true, force: true });
+    await fs.promises.rm(this.normalize(path), { recursive: true, force: true });
     this.notifyChange(path);
   }
 
@@ -392,7 +413,7 @@ class VFS {
     const normalized = this.normalize(path);
     const parent = normalized.substring(0, normalized.lastIndexOf('/')) || '/';
     const newPath = this.normalize(`${parent}/${newName}`);
-    fs.renameSync(normalized, newPath);
+    await fs.promises.rename(normalized, newPath);
     this.notifyChange(path);
     this.notifyChange(newPath);
   }
@@ -401,45 +422,51 @@ class VFS {
     await this.init();
     const srcNorm = this.normalize(src);
     const destNorm = this.normalize(dest);
-    const stats = fs.statSync(srcNorm);
+    const stats = await fs.promises.stat(srcNorm);
 
     if (stats.isDirectory()) {
-      if (!fs.existsSync(destNorm)) fs.mkdirSync(destNorm, { recursive: true });
-      const entries = fs.readdirSync(srcNorm);
+      if (!(await this.exists(destNorm))) await fs.promises.mkdir(destNorm, { recursive: true });
+      const entries = await fs.promises.readdir(srcNorm);
       for (const entry of entries) {
         await this.copy(`${srcNorm}/${entry}`, `${destNorm}/${entry}`);
       }
     } else {
-      fs.copyFileSync(srcNorm, destNorm);
+      await fs.promises.copyFile(srcNorm, destNorm);
     }
     this.notifyChange(dest);
   }
 
   async move(src: string, dest: string) {
     await this.init();
-    fs.renameSync(this.normalize(src), this.normalize(dest));
+    await fs.promises.rename(this.normalize(src), this.normalize(dest));
     this.notifyChange(src);
     this.notifyChange(dest);
   }
 
-  async getSize(path: string): Promise<number> {
+  async getSize(path: string, maxDepth = 3): Promise<number> {
     await this.init();
     const normalized = this.normalize(path);
-    const stats = fs.statSync(normalized);
-    if (stats.isFile()) return stats.size;
+    try {
+      const stats = await fs.promises.stat(normalized);
+      if (stats.isFile()) return stats.size;
 
-    let total = 0;
-    const entries = fs.readdirSync(normalized);
-    for (const entry of entries) {
-      total += await this.getSize(`${normalized}/${entry}`);
+      if (maxDepth <= 0) return 0;
+
+      let total = 0;
+      const entries = await fs.promises.readdir(normalized);
+      for (const entry of entries) {
+        total += await this.getSize(`${normalized}/${entry}`, maxDepth - 1);
+      }
+      return total;
+    } catch (err) {
+      return 0;
     }
-    return total;
   }
 
   async getProperties(path: string): Promise<VFSProperties> {
     await this.init();
     const normalized = this.normalize(path);
-    const stats = fs.statSync(normalized);
+    const stats = await fs.promises.stat(normalized);
     return {
       size: await this.getSize(normalized),
       lastModified: stats.mtimeMs,
@@ -454,14 +481,31 @@ class VFS {
     const name = handle.name;
     const mountPath = `/mnt/${name}`;
 
-    // 1. Create mount point if it doesn't exist
-    if (!fs.existsSync(mountPath)) fs.mkdirSync(mountPath, { recursive: true });
+    // 1. Check if already mounted
+    if (this.mountPoints.has(name)) {
+      console.log(`VFS: ${name} is already mounted, skipping.`);
+      return name;
+    }
 
-    // 2. Mount in ZenFS
-    const config = await resolveMountConfig({ backend: WebAccess, handle });
-    fs.mount(mountPath, config);
+    // 2. Create mount point if it doesn't exist
+    if (!fs.existsSync(mountPath)) {
+      try {
+        fs.mkdirSync(mountPath, { recursive: true });
+      } catch (err) {
+        console.warn(`VFS: Failed to create mount point ${mountPath}:`, err);
+      }
+    }
 
-    // 3. Store handle in IndexedDB for persistence
+    // 3. Mount in ZenFS
+    try {
+      const config = await resolveMountConfig({ backend: WebAccess, handle });
+      fs.mount(mountPath, config);
+    } catch (err) {
+      console.error(`VFS: Failed to mount ${name}:`, err);
+      throw new Error(`Failed to mount folder: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // 4. Store handle in IndexedDB for persistence
     try {
       const store = await this.getHandleStore('readwrite');
       store.put(handle, name);
@@ -469,9 +513,13 @@ class VFS {
       console.warn('VFS: Failed to persist mount handle:', err);
     }
 
-    // 4. Store metadata for legacy support
-    if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
-    fs.writeFileSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`, JSON.stringify({ name, path: mountPath }));
+    // 5. Store metadata for legacy support
+    try {
+      if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
+      fs.writeFileSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`, JSON.stringify({ name, path: mountPath }));
+    } catch (err) {
+       console.warn('VFS: Failed to write mount metadata:', err);
+    }
 
     this.mountPoints.add(name);
     this.notifyChange('/');
@@ -520,28 +568,49 @@ class VFS {
     return true;
   }
 
-  async getTree(): Promise<VFSNode[]> {
+  /**
+   * Fetches the tree structure.
+   * Strictly ignores files to ensure speed.
+   */
+  async getTree(path = '/', depth = 1): Promise<VFSNode[]> {
     await this.init();
-    const rootItems = await this.ls('/');
+    const items = await this.getChildren(path);
     
-    const populateChildren = async (items: VFSNode[]) => {
-      for (const item of items) {
-        if (item.type === 'dir' || item.isMountPoint) {
-          try {
-            const childrenNames = fs.readdirSync(item.path);
-            const allNodes = childrenNames.map(child => this.getNodeInfo(`${item.path === '/' ? '' : item.path}/${child}`));
-            // Filter to only include directories or mount points in the tree view
-            item.children = allNodes.filter(node => node.type === 'dir' || node.isMountPoint);
-            await populateChildren(item.children);
-          } catch (err) {
-            // Silently skip inaccessible dirs
-          }
-        }
-      }
-    };
+    if (depth <= 0) return items;
 
-    await populateChildren(rootItems);
-    return rootItems;
+    for (const item of items) {
+      try {
+        item.children = await this.getTree(item.path, depth - 1);
+      } catch (err) {
+        // Skip inaccessible
+      }
+    }
+
+    return items;
+  }
+
+  /**
+   * Fetches immediate children of a path. 
+   * Strictly filters out files for the tree view.
+   */
+  async getChildren(path: string): Promise<VFSNode[]> {
+    await this.init();
+    const normalized = this.normalize(path);
+
+    if (normalized === '/') {
+      const rootItems = await this.ls('/');
+      return rootItems.filter(node => node.type === 'dir' || node.isMountPoint);
+    }
+
+    try {
+      const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
+      return entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => this.formatDirent(normalized, entry));
+    } catch (err) {
+      console.error(`VFS: getChildren failed for ${normalized}:`, err);
+      return [];
+    }
   }
 
   async exportStorage(excludePaths: string[] = []): Promise<Blob> {

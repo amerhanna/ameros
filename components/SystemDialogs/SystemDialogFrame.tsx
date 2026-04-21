@@ -99,6 +99,19 @@ export function SystemDialogFrame({
     loadTreeItems();
   }, [loadTreeItems]);
 
+  useEffect(() => {
+    const handleVfsChange = (e: any) => {
+      const { path } = e.detail;
+      if (path === '/' || path === currentPath || currentPath.startsWith(path)) {
+        loadFolderItems();
+        loadTreeItems();
+      }
+    };
+
+    window.addEventListener('vfs-change', handleVfsChange);
+    return () => window.removeEventListener('vfs-change', handleVfsChange);
+  }, [currentPath, loadFolderItems, loadTreeItems]);
+
   const handleSelect = (node: VFSNode) => {
     if (node.type === 'file' && (selectionMode === 'file' || selectionMode === 'save')) {
       setSelectedName(node.name);
@@ -165,6 +178,30 @@ export function SystemDialogFrame({
     loadFolder(newPath);
     setSelectedName('');
   };
+
+  const handleToggle = useCallback(async (item: VFSNode, expanded: boolean) => {
+    if (expanded && (!item.children || item.children.length === 0)) {
+      try {
+        const children = await vfs.getChildren(item.path);
+        setTreeData((prev) => {
+          const updateNodes = (nodes: VFSNode[]): VFSNode[] => {
+            return nodes.map((node) => {
+              if (node.path === item.path) {
+                return { ...node, children };
+              }
+              if (node.children) {
+                return { ...node, children: updateNodes(node.children) };
+              }
+              return node;
+            });
+          };
+          return updateNodes(prev);
+        });
+      } catch (err) {
+        // Silent fail for dialogs or handle gracefully
+      }
+    }
+  }, []);
 
   const handleConfirm = () => {
     if (selectionMode === 'folder') {
@@ -235,6 +272,7 @@ export function SystemDialogFrame({
               selectedPath={currentPath}
               onOpen={handleOpen}
               onSelect={handleOpen}
+              onToggle={handleToggle}
               onContextMenu={() => {}}
               onRetry={() => loadTreeItems()}
             />
