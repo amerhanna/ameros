@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useWindowActions } from '@/hooks/useWindowActions';
+import { useSystemActions } from '@/hooks/useSystemActions';
+import { WindowContext } from '@/components/WindowManager/WindowContext';
+import { useContext } from 'react';
 
 type Resolver<T> = (value: T) => void;
 
@@ -22,7 +25,11 @@ function MessageBoxContent({ message, buttons, onResolve }: MessageBoxProps) {
       if (resolvedRef.current) return;
       resolvedRef.current = true;
       onResolve(value);
-      close();
+      try {
+        close();
+      } catch (e) {
+        // Fallback for system-level messages 
+      }
     },
     [onResolve, close],
   );
@@ -144,14 +151,30 @@ function InputBoxContent({ message, onResolve }: InputBoxProps) {
  * - `showInputBox(title, message, isModal?)`: Displays a text input prompt. Resolves to the user's typed string or null if dismissed/cancelled.
  */
 export function useMessageBox() {
-  const { openChildWindow, getBounds } = useWindowActions();
+  const windowContext = useContext(WindowContext);
+  const systemActions = useSystemActions();
+
+  // Helper to get actions regardless of context
+  const getActions = useCallback(() => {
+    if (windowContext) {
+      return {
+        open: (config: any) => windowContext.openChildWindow(config),
+        getBounds: windowContext.getBounds
+      };
+    }
+    return {
+      open: (config: any) => systemActions.launchApp(config.component, config),
+      getBounds: () => ({ x: 0, y: 0, width: typeof window !== 'undefined' ? window.innerWidth : 1024, height: typeof window !== 'undefined' ? window.innerHeight : 768 })
+    };
+  }, [windowContext, systemActions]);
 
   const showMessageBox = useCallback(
     async (title: string, message: string, isModal = true, buttons: string[] = ['OK']) => {
+      const actions = getActions();
       const safeButtons = buttons.length > 0 ? buttons : ['OK'];
       const boxW = 360;
       const boxH = 170;
-      const { x: bx, y: by, width: bw, height: bh } = getBounds();
+      const { x: bx, y: by, width: bw, height: bh } = actions.getBounds();
       const px = Math.round(bx + Math.max(0, (bw - boxW) / 2));
       const py = Math.round(by + Math.max(0, (bh - boxH) / 2));
 
@@ -164,7 +187,7 @@ export function useMessageBox() {
           />
         );
 
-        const id = openChildWindow({
+        const id = actions.open({
           title,
           component: Content,
           width: boxW,
@@ -182,21 +205,22 @@ export function useMessageBox() {
         }
       });
     },
-    [openChildWindow, getBounds],
+    [getActions],
   );
 
   const showInputBox = useCallback(
     async (title: string, message: string, isModal = true) => {
+      const actions = getActions();
       const boxW = 420;
       const boxH = 180;
-      const { x: bx, y: by, width: bw, height: bh } = getBounds();
+      const { x: bx, y: by, width: bw, height: bh } = actions.getBounds();
       const px = Math.round(bx + Math.max(0, (bw - boxW) / 2));
       const py = Math.round(by + Math.max(0, (bh - boxH) / 2));
 
       return new Promise<string | null>((resolve) => {
         const Content = () => <InputBoxContent message={message} onResolve={resolve} />;
 
-        const id = openChildWindow({
+        const id = actions.open({
           title,
           component: Content,
           width: boxW,
@@ -214,7 +238,7 @@ export function useMessageBox() {
         }
       });
     },
-    [openChildWindow, getBounds],
+    [getActions],
   );
 
   return useMemo(

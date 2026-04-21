@@ -2,7 +2,68 @@
   {
     "name": "HKEY_CLASSES_ROOT",
     "type": "key",
-    "content": []
+    "content": [
+      {
+        "name": ".txt",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "txtfile" }]
+      },
+      {
+        "name": "txtfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Text Document" },
+          { "name": "DefaultIcon", "type": "string", "content": "FileText" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "TextEditor"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": ".reg",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "regfile" }]
+      },
+      {
+        "name": "regfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Registration Entries" },
+          { "name": "DefaultIcon", "type": "string", "content": "Settings" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Regedit"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
   },
   {
     "name": "HKEY_CURRENT_USER",

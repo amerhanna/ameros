@@ -4,6 +4,7 @@ import { HardDrive, Folder, File as FileIcon, FileText, Lock } from "lucide-reac
 import { type VFSNode } from "@/lib/vfs";
 import { ItemView } from "@/components/ItemView";
 import { type ClipboardState } from "@/lib/clipboard";
+import { RegistryFileIcon, RegistryFileTypeLabel } from "./RegistryFileDetails";
 
 interface FolderViewProps {
   items: VFSNode[];
@@ -31,14 +32,8 @@ const formatDate = (timestamp: number) => {
   return date.toLocaleString();
 };
 
-const formatFileType = (name: string, path: string, type: string, isMountPoint?: boolean) => {
-  if (type === "dir") return "File Folder";
-  if (type === "drive") {
-    if (isMountPoint) return "System Drive";
-    return "Mounted Drive";
-  }
-  const ext = name.split(".").pop()?.toUpperCase() || "";
-  return ext ? `${ext} File` : "File";
+const formatFileType = (item: VFSNode) => {
+  return <RegistryFileTypeLabel item={item} />;
 };
 
 export function FolderView({
@@ -54,19 +49,7 @@ export function FolderView({
   onRetry,
 }: FolderViewProps) {
   const getIcon = (item: VFSNode) => {
-    if (item.isMountPoint) {
-      return <HardDrive className="w-10 h-10 text-blue-600" />;
-    }
-
-    if (item.type === "dir") {
-      return <Folder className="w-10 h-10 text-amber-400 fill-amber-400/20" />;
-    }
-
-    if (item.name.endsWith(".txt")) {
-      return <FileText className="w-10 h-10 text-blue-400" />;
-    }
-
-    return <FileIcon className="w-10 h-10 text-slate-400" />;
+    return <RegistryFileIcon item={item} />;
   };
 
   const getStatusIcon = (item: VFSNode) => (item.status === "prompt" ? <Lock className="w-3 h-3 text-amber-500 fill-amber-500" /> : null);
@@ -78,7 +61,7 @@ export function FolderView({
       error={error}
       columnNames={viewStyle === "details" ? ["Name", "Type", "Last Modified", "Size"] : undefined}
       detailsMapper={
-        viewStyle === "details" ? (item) => [formatFileType(item.name, item.path, item.type), formatDate(item.lastModified), "not implemented yet"] : undefined
+        viewStyle === "details" ? (item) => [formatFileType(item), formatDate(item.lastModified), "not implemented yet"] : undefined
       }
       clipboard={clipboard}
       viewStyle={viewStyle}
