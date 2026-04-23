@@ -54,9 +54,9 @@ interface TextEditorProps {
   initialContent?: string;
 }
 
-export default function TextEditor({ filePath, initialContent = "" }: TextEditorProps) {
+export default function TextEditor({ filePath, }: TextEditorProps) {
   const { openChildWindow, setMenuBar } = useWindowActions();
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState("");
 
   const handleOpenSearch = () => {
     openChildWindow({

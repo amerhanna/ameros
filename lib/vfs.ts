@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { configure, fs, resolveMountConfig, type Backend } from '@zenfs/core';
-import { IndexedDB, WebAccess } from '@zenfs/dom';
-import defaultVfs from './vfs-defaults';
+import { configure, fs, resolveMountConfig, type Backend } from "@zenfs/core";
+import { IndexedDB, WebAccess } from "@zenfs/dom";
+import defaultVfs from "./vfs-defaults";
 
 /**
  * AmerOS Virtual File System (VFS) - Phase 2
@@ -14,15 +14,15 @@ import defaultVfs from './vfs-defaults';
 export interface VFSNode {
   path: string;
   name: string;
-  type: 'dir' | 'file';
+  type: "dir" | "file";
   lastModified: number;
   isMountPoint?: boolean;
-  status?: 'granted' | 'denied' | 'prompt';
+  status?: "granted" | "denied" | "prompt";
   children?: VFSNode[];
 }
 
 export interface LSOptions {
-  types?: 'file' | 'dir' | 'all';
+  types?: "file" | "dir" | "all";
   name?: string;
   depth?: number;
   isSearch?: boolean;
@@ -35,13 +35,13 @@ export type FolderTreeNode = VFSNode;
 export interface VFSProperties {
   size: number;
   lastModified: number;
-  type: 'file' | 'dir';
+  type: "file" | "dir";
   readOnly: boolean;
   path: string;
 }
 
-const OLD_DB_NAME = 'AmerOS_VFS';
-const SYSTEM_MOUNTS_DIR = '/System/mounts';
+const OLD_DB_NAME = "AmerOS_VFS";
+const SYSTEM_MOUNTS_DIR = "/System/mounts";
 
 class VFS {
   private initPromise: Promise<void> | null = null;
@@ -53,11 +53,11 @@ class VFS {
     this.initPromise = (async () => {
       try {
         // 1. Request persistence
-        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+        if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
           try {
             await navigator.storage.persist();
           } catch (err) {
-            console.warn('VFS: Storage persistence request failed', err);
+            console.warn("VFS: Storage persistence request failed", err);
           }
         }
 
@@ -65,46 +65,46 @@ class VFS {
         // We prioritize OPFS (WebAccess) but fallback to IndexedDB if unavailable
         try {
           let opfsHandle: any = null;
-          if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+          if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.getDirectory) {
             try {
               opfsHandle = await navigator.storage.getDirectory();
             } catch (err) {
-              console.warn('VFS: Failed to get OPFS directory handle', err);
+              console.warn("VFS: Failed to get OPFS directory handle", err);
             }
           }
 
           if (opfsHandle) {
             await configure({
               mounts: {
-                '/': { backend: WebAccess, handle: opfsHandle },
-                '/System': IndexedDB,
-                '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
-              }
+                "/": { backend: WebAccess, handle: opfsHandle },
+                "/System": IndexedDB,
+                "/System/mnt": { backend: IndexedDB, storeName: "external_mounts" },
+              },
             });
           } else {
-            throw new Error('OPFS not available');
+            throw new Error("OPFS not available");
           }
         } catch (err) {
-          console.warn('VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root', err);
+          console.warn("VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root", err);
           await configure({
             mounts: {
-              '/': IndexedDB,
-              '/System': IndexedDB,
-              '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
-            }
+              "/": IndexedDB,
+              "/System": IndexedDB,
+              "/System/mnt": { backend: IndexedDB, storeName: "external_mounts" },
+            },
           });
         }
 
         // 3. Seed Defaults
         await this.seedDefaults();
-  
+
         // 4. Data Migration (Optional)
         await this.migrateLegacyData();
-  
-        // 5. Load saved mounts (Background - Non-blocking)
-        this.restoreMounts().catch(err => console.warn('VFS: Background mount restoration failed', err));
 
-        console.log('VFS: ZenFS initialized at root (/)');
+        // 5. Load saved mounts (Background - Non-blocking)
+        this.restoreMounts().catch((err) => console.warn("VFS: Background mount restoration failed", err));
+
+        console.log("VFS: ZenFS initialized at root (/)");
       } catch (err) {
         this.initPromise = null;
         throw err;
@@ -115,13 +115,13 @@ class VFS {
   }
 
   private async migrateLegacyData() {
-    if (typeof indexedDB === 'undefined') return;
+    if (typeof indexedDB === "undefined") return;
 
     try {
       const dbs = await indexedDB.databases();
-      if (!dbs.find(db => db.name === OLD_DB_NAME)) return;
+      if (!dbs.find((db) => db.name === OLD_DB_NAME)) return;
 
-      console.log('VFS: Legacy AmerOS_VFS detected. Starting migration...');
+      console.log("VFS: Legacy AmerOS_VFS detected. Starting migration...");
 
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(OLD_DB_NAME);
@@ -129,8 +129,8 @@ class VFS {
         request.onerror = () => reject(request.error);
       });
 
-      const transaction = db.transaction(['files'], 'readonly');
-      const store = transaction.objectStore('files');
+      const transaction = db.transaction(["files"], "readonly");
+      const store = transaction.objectStore("files");
       const request = store.getAll();
 
       const nodes = await new Promise<any[]>((resolve, reject) => {
@@ -139,18 +139,18 @@ class VFS {
       });
 
       for (const node of nodes) {
-        const newPath = node.path.replace(/^C:/, '');
-        if (!newPath || newPath === '/') continue;
+        const newPath = node.path.replace(/^C:/, "");
+        if (!newPath || newPath === "/") continue;
 
         try {
-          if (node.type === 'dir') {
+          if (node.type === "dir") {
             if (!(await this.pathExists(newPath))) await fs.promises.mkdir(newPath, { recursive: true });
           } else {
-            const parentDir = newPath.substring(0, newPath.lastIndexOf('/'));
-            if (parentDir && parentDir !== '' && !(await this.pathExists(parentDir))) {
+            const parentDir = newPath.substring(0, newPath.lastIndexOf("/"));
+            if (parentDir && parentDir !== "" && !(await this.pathExists(parentDir))) {
               await fs.promises.mkdir(parentDir, { recursive: true });
             }
-            
+
             let content = node.content;
             if (content instanceof Blob) {
               content = new Uint8Array(await content.arrayBuffer());
@@ -169,16 +169,16 @@ class VFS {
         delReq.onerror = () => reject(delReq.error);
       });
 
-      console.log('VFS: Legacy migration completed.');
+      console.log("VFS: Legacy migration completed.");
     } catch (err) {
-      console.error('VFS: Data migration error:', err);
+      console.error("VFS: Data migration error:", err);
     }
   }
 
   private async seedDefaults() {
     try {
       // 1. Ensure core system directories exist
-      const coreDirs = ['/home', '/System', SYSTEM_MOUNTS_DIR];
+      const coreDirs = ["/home", "/System", SYSTEM_MOUNTS_DIR];
       for (const dir of coreDirs) {
         if (!(await this.pathExists(dir))) {
           await fs.promises.mkdir(dir, { recursive: true });
@@ -193,11 +193,11 @@ class VFS {
       }
 
       for (const file of defaultVfs.files) {
-        const path = '/' + file.relativePath;
+        const path = "/" + file.relativePath;
         if (!(await this.pathExists(path))) {
           try {
             // Check if parent directory exists
-            const parent = path.substring(0, path.lastIndexOf('/'));
+            const parent = path.substring(0, path.lastIndexOf("/"));
             if (parent && !(await this.pathExists(parent))) {
               await fs.promises.mkdir(parent, { recursive: true });
             }
@@ -208,7 +208,7 @@ class VFS {
             for (let i = 0; i < binaryString.length; i++) {
               bytes[i] = binaryString.charCodeAt(i);
             }
-            
+
             await fs.promises.writeFile(path, bytes);
           } catch (err) {
             console.warn(`VFS: Failed to seed file ${path}:`, err);
@@ -216,7 +216,7 @@ class VFS {
         }
       }
     } catch (err) {
-      console.error('VFS: Seeding failed', err);
+      console.error("VFS: Seeding failed", err);
     }
   }
 
@@ -229,19 +229,19 @@ class VFS {
     }
   }
 
-  private async getHandleStore(mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
+  private async getHandleStore(mode: IDBTransactionMode = "readonly"): Promise<IDBObjectStore> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('AmerOS_MountHandles', 1);
+      const request = indexedDB.open("AmerOS_MountHandles", 1);
       request.onupgradeneeded = () => {
         const db = request.result;
-        if (!db.objectStoreNames.contains('handles')) {
-          db.createObjectStore('handles');
+        if (!db.objectStoreNames.contains("handles")) {
+          db.createObjectStore("handles");
         }
       };
       request.onsuccess = () => {
         const db = request.result;
-        const transaction = db.transaction('handles', mode);
-        resolve(transaction.objectStore('handles'));
+        const transaction = db.transaction("handles", mode);
+        resolve(transaction.objectStore("handles"));
       };
       request.onerror = () => reject(request.error);
     });
@@ -259,41 +259,43 @@ class VFS {
       const keysRequest = store.getAllKeys();
 
       const [handles, names] = await Promise.all([
-        new Promise<FileSystemDirectoryHandle[]>((resolve) => { request.onsuccess = () => resolve(request.result); }),
-        new Promise<string[]>((resolve) => { keysRequest.onsuccess = () => resolve(keysRequest.result as string[]); })
+        new Promise<FileSystemDirectoryHandle[]>((resolve) => {
+          request.onsuccess = () => resolve(request.result);
+        }),
+        new Promise<string[]>((resolve) => {
+          keysRequest.onsuccess = () => resolve(keysRequest.result as string[]);
+        }),
       ]);
 
       // 2. Mount each one
-    for (const name of names) {
-      const handle = handles[names.indexOf(name)];
-      const mountPath = `/${name}`;
+      for (const name of names) {
+        const handle = handles[names.indexOf(name)];
+        const mountPath = `/${name}`;
 
-      try {
-        const config = await resolveMountConfig({ backend: WebAccess, handle });
-        
-        if (!(await this.pathExists(mountPath))) await fs.promises.mkdir(mountPath, { recursive: true });
-        
         try {
-          fs.mount(mountPath, config);
-          this.mountPoints.add(name);
-          console.log(`VFS: Restored mount ${mountPath}`);
-        } catch (mountErr) {
-          if (String(mountErr).includes('already in use')) {
-            this.mountPoints.add(name);
-          } else {
-            throw mountErr;
-          }
-        }
-        
-      } catch (err) {
-        console.warn(`VFS: Failed to restore mount ${name}:`, err);
-      }
-    }
-    // Notify root that mounts have been restored
-    this.notifyChange('/');
+          const config = await resolveMountConfig({ backend: WebAccess, handle });
 
+          if (!(await this.pathExists(mountPath))) await fs.promises.mkdir(mountPath, { recursive: true });
+
+          try {
+            fs.mount(mountPath, config);
+            this.mountPoints.add(name);
+            console.log(`VFS: Restored mount ${mountPath}`);
+          } catch (mountErr) {
+            if (String(mountErr).includes("already in use")) {
+              this.mountPoints.add(name);
+            } else {
+              throw mountErr;
+            }
+          }
+        } catch (err) {
+          console.warn(`VFS: Failed to restore mount ${name}:`, err);
+        }
+      }
+      // Notify root that mounts have been restored
+      this.notifyChange("/");
     } catch (err) {
-      console.warn('VFS: Restore mounts failed:', err);
+      console.warn("VFS: Restore mounts failed:", err);
     }
   }
 
@@ -307,16 +309,16 @@ class VFS {
   async ls(path: string, options: LSOptions = { depth: 1 }): Promise<VFSNode[]> {
     await this.init();
     const normalized = this.normalize(path);
-    const { types = 'all', name = '*', depth = 1, isSearch = false } = options;
+    const { types = "all", name = "*", depth = 1, isSearch = false } = options;
     const nameRegex = this.wildcardToRegex(name);
 
     // Root-specific curated view logic (only for depth 1 at '/')
-    if (normalized === '/' && depth === 1 && !isSearch) {
+    if (normalized === "/" && depth === 1 && !isSearch) {
       const results: VFSNode[] = [];
-      
+
       // Home is ALWAYS first
-      if (fs.existsSync('/home')) {
-        results.push(await this.getNodeInfo('/home', 'Home'));
+      if (fs.existsSync("/home")) {
+        results.push(await this.getNodeInfo("/home", "Home"));
       }
 
       // Add Mounts
@@ -325,7 +327,7 @@ class VFS {
         if (fs.existsSync(mountPath)) {
           results.push({
             ...(await this.getNodeInfo(mountPath, mount)),
-            isMountPoint: true
+            isMountPoint: true,
           });
         }
       }
@@ -337,10 +339,10 @@ class VFS {
     const walk = async (currPath: string, currDepth: number) => {
       try {
         const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
-        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
+        const nodes = entries.map((entry) => this.formatDirent(currPath, entry));
 
         for (const node of nodes) {
-          const matchesType = types === 'all' || node.type === types;
+          const matchesType = types === "all" || node.type === types;
           const matchesName = nameRegex.test(node.name);
 
           // If it matches, add it to results based on search/nested mode
@@ -353,20 +355,20 @@ class VFS {
           }
 
           // Recurse if needed
-          if (node.type === 'dir' && currDepth < depth) {
+          if (node.type === "dir" && currDepth < depth) {
             const children = await walk(node.path, currDepth + 1);
             if (!isSearch && !matchesName && matchesType) {
-                // If we are building a tree and this folder didn't match but we are going deeper? 
-                // Usually ls(depth) means we want the structure.
+              // If we are building a tree and this folder didn't match but we are going deeper?
+              // Usually ls(depth) means we want the structure.
             }
             if (!isSearch) {
-               node.children = children;
-               if (currDepth === depth - 1 && !isSearch) {
-                 // We only add top-level nodes to results in nested mode
-                 if (currPath === normalized) {
-                    results.push(node);
-                 }
-               }
+              node.children = children;
+              if (currDepth === depth - 1 && !isSearch) {
+                // We only add top-level nodes to results in nested mode
+                if (currPath === normalized) {
+                  results.push(node);
+                }
+              }
             }
           }
         }
@@ -380,17 +382,17 @@ class VFS {
     const recursiveList = async (currPath: string, currDepth: number): Promise<VFSNode[]> => {
       try {
         const entries = await fs.promises.readdir(currPath, { withFileTypes: true });
-        const nodes = entries.map(entry => this.formatDirent(currPath, entry));
+        const nodes = entries.map((entry) => this.formatDirent(currPath, entry));
         const matchedNodes: VFSNode[] = [];
 
         for (const node of nodes) {
           // Explicitly hide system folders from the top level
-          if (currPath === '/' && (node.name === 'System' || node.name === 'mnt')) continue;
+          if (currPath === "/" && (node.name === "System" || node.name === "mnt")) continue;
 
-          const matchesType = types === 'all' || node.type === types;
+          const matchesType = types === "all" || node.type === types;
           const matchesName = nameRegex.test(node.name);
 
-          if (node.type === 'dir' && currDepth < depth) {
+          if (node.type === "dir" && currDepth < depth) {
             node.children = await recursiveList(node.path, currDepth + 1);
           }
 
@@ -414,49 +416,49 @@ class VFS {
     }
   }
 
-  private filterNodes(nodes: VFSNode[], criteria: { types: string, nameRegex: RegExp }): VFSNode[] {
-    return nodes.filter(node => {
-      const matchesType = criteria.types === 'all' || node.type === criteria.types;
+  private filterNodes(nodes: VFSNode[], criteria: { types: string; nameRegex: RegExp }): VFSNode[] {
+    return nodes.filter((node) => {
+      const matchesType = criteria.types === "all" || node.type === criteria.types;
       const matchesName = criteria.nameRegex.test(node.name);
       return matchesType && matchesName;
     });
   }
 
   private wildcardToRegex(pattern: string): RegExp {
-    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-    const regex = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
-    return new RegExp(`^${regex}$`, 'i');
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    const regex = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
+    return new RegExp(`^${regex}$`, "i");
   }
 
   private formatDirent(parent: string, entry: any): VFSNode {
-    const path = `${parent === '/' ? '' : parent}/${entry.name}`;
+    const path = `${parent === "/" ? "" : parent}/${entry.name}`;
     return {
       path,
       name: entry.name,
-      type: entry.isDirectory() ? 'dir' : 'file',
+      type: entry.isDirectory() ? "dir" : "file",
       lastModified: Date.now(), // Metadata should be fetched lazily if needed
-      isMountPoint: this.isMountPoint(path)
+      isMountPoint: this.isMountPoint(path),
     };
   }
 
   private async getNodeInfo(path: string, alias?: string): Promise<VFSNode> {
     try {
       const stats = await fs.promises.stat(path);
-      const name = alias || path.split('/').filter(Boolean).pop() || '/';
+      const name = alias || path.split("/").filter(Boolean).pop() || "/";
       return {
         path,
         name,
-        type: stats.isDirectory() ? 'dir' : 'file',
+        type: stats.isDirectory() ? "dir" : "file",
         lastModified: stats.mtimeMs,
-        isMountPoint: this.isMountPoint(path)
+        isMountPoint: this.isMountPoint(path),
       };
     } catch (err) {
       return {
         path,
-        name: alias || path.split('/').filter(Boolean).pop() || 'unknown',
-        type: 'file',
+        name: alias || path.split("/").filter(Boolean).pop() || "unknown",
+        type: "file",
         lastModified: Date.now(),
-        isMountPoint: this.isMountPoint(path)
+        isMountPoint: this.isMountPoint(path),
       };
     }
   }
@@ -466,7 +468,7 @@ class VFS {
     return fs.existsSync(this.normalize(path));
   }
 
-  async readFile(path: string): Promise<Blob | string | ArrayBuffer> {
+  async readFile(path: string) {
     await this.init();
     const data = await fs.promises.readFile(this.normalize(path));
     return new Blob([data]);
@@ -512,7 +514,7 @@ class VFS {
   async rename(path: string, newName: string) {
     await this.init();
     const normalized = this.normalize(path);
-    const parent = normalized.substring(0, normalized.lastIndexOf('/')) || '/';
+    const parent = normalized.substring(0, normalized.lastIndexOf("/")) || "/";
     const newPath = this.normalize(`${parent}/${newName}`);
     await fs.promises.rename(normalized, newPath);
     this.notifyChange(path);
@@ -571,9 +573,9 @@ class VFS {
     return {
       size: await this.getSize(normalized),
       lastModified: stats.mtimeMs,
-      type: stats.isDirectory() ? 'dir' : 'file',
+      type: stats.isDirectory() ? "dir" : "file",
       readOnly: false,
-      path: normalized
+      path: normalized,
     };
   }
 
@@ -608,10 +610,10 @@ class VFS {
 
     // 4. Store handle in IndexedDB for persistence
     try {
-      const store = await this.getHandleStore('readwrite');
+      const store = await this.getHandleStore("readwrite");
       store.put(handle, name);
     } catch (err) {
-      console.warn('VFS: Failed to persist mount handle:', err);
+      console.warn("VFS: Failed to persist mount handle:", err);
     }
 
     // 5. Store metadata for legacy support
@@ -619,18 +621,18 @@ class VFS {
       if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
       fs.writeFileSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`, JSON.stringify({ name, path: mountPath }));
     } catch (err) {
-       console.warn('VFS: Failed to write mount metadata:', err);
+      console.warn("VFS: Failed to write mount metadata:", err);
     }
 
     this.mountPoints.add(name);
-    this.notifyChange('/');
+    this.notifyChange("/");
     return name;
   }
 
   async unmountFolder(name: string) {
     await this.init();
     const mountPath = `/${name}`;
-    
+
     try {
       fs.umount(mountPath);
     } catch (err) {
@@ -639,37 +641,37 @@ class VFS {
 
     // Remove handle from IndexedDB
     try {
-      const store = await this.getHandleStore('readwrite');
+      const store = await this.getHandleStore("readwrite");
       store.delete(name);
     } catch (err) {
-      console.warn('VFS: Failed to remove persisted handle:', err);
+      console.warn("VFS: Failed to remove persisted handle:", err);
     }
 
     if (fs.existsSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`)) {
-      try { fs.rmSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`); } catch {}
+      try {
+        fs.rmSync(`${SYSTEM_MOUNTS_DIR}/${name}.mnt`);
+      } catch {}
     }
     this.mountPoints.delete(name);
-    this.notifyChange('/');
+    this.notifyChange("/");
   }
 
   async getMounts() {
     await this.init();
-    return Array.from(this.mountPoints).map(name => ({
-      letter: name, 
+    return Array.from(this.mountPoints).map((name) => ({
+      letter: name,
       name: name,
-      path: `/${name}`
+      path: `/${name}`,
     }));
   }
 
   private getUniqueMountName(name: string): string {
-    const reserved = ['home', 'System', 'mnt', 'System/mnt'];
+    const reserved = ["home", "System", "mnt", "System/mnt"];
     let finalName = name;
     let counter = 1;
 
-    const isTaken = (n: string) => 
-      this.mountPoints.has(n) || 
-      reserved.some(r => r.toLowerCase() === n.toLowerCase()) ||
-      fs.existsSync(`/${n}`);
+    const isTaken = (n: string) =>
+      this.mountPoints.has(n) || reserved.some((r) => r.toLowerCase() === n.toLowerCase()) || fs.existsSync(`/${n}`);
 
     while (isTaken(finalName)) {
       counter++;
@@ -679,8 +681,8 @@ class VFS {
     return finalName;
   }
 
-  async checkPermission(name: string): Promise<'granted' | 'denied' | 'prompt'> {
-    return 'granted';
+  async checkPermission(name: string): Promise<"granted" | "denied" | "prompt"> {
+    return "granted";
   }
 
   async requestPermission(name: string): Promise<boolean> {
@@ -691,18 +693,18 @@ class VFS {
 
   async exportStorage(excludePaths: string[] = []): Promise<Blob> {
     await this.init();
-    const { BlobWriter, ZipWriter, BlobReader } = await import('@zip.js/zip.js');
-    const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+    const { BlobWriter, ZipWriter, BlobReader } = await import("@zip.js/zip.js");
+    const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
 
     const walk = async (dir: string) => {
       const entries = fs.readdirSync(dir);
       for (const entry of entries) {
-        const fullPath = this.normalize(`${dir === '/' ? '' : dir}/${entry}`);
-        if (excludePaths.some(p => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + '/'))) continue;
+        const fullPath = this.normalize(`${dir === "/" ? "" : dir}/${entry}`);
+        if (excludePaths.some((p) => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + "/"))) continue;
 
         const stats = fs.statSync(fullPath);
         if (stats.isDirectory()) {
-          await zipWriter.add(entry + '/', new BlobReader(new Blob([])), { directory: true });
+          await zipWriter.add(entry + "/", new BlobReader(new Blob([])), { directory: true });
           await walk(fullPath);
         } else {
           const data = fs.readFileSync(fullPath);
@@ -711,29 +713,29 @@ class VFS {
       }
     };
 
-    await walk('/');
+    await walk("/");
     return await zipWriter.close();
   }
 
   async importStorage(zipBlob: Blob) {
     await this.init();
-    const { ZipReader, BlobReader, Uint8ArrayWriter } = await import('@zip.js/zip.js');
+    const { ZipReader, BlobReader, Uint8ArrayWriter } = await import("@zip.js/zip.js");
     const zipReader = new ZipReader(new BlobReader(zipBlob));
     const entries = await zipReader.getEntries();
 
     for (const entry of entries) {
-      const path = '/' + entry.filename.replace(/\/$/, '');
+      const path = "/" + entry.filename.replace(/\/$/, "");
       if (entry.directory) {
         if (!fs.existsSync(path)) fs.mkdirSync(path, { recursive: true });
       } else {
         const data = await entry.getData!(new Uint8ArrayWriter());
-        const parent = path.substring(0, path.lastIndexOf('/'));
+        const parent = path.substring(0, path.lastIndexOf("/"));
         if (parent && !fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
         fs.writeFileSync(path, data);
       }
     }
     await zipReader.close();
-    this.notifyChange('/');
+    this.notifyChange("/");
   }
 
   async clearStorage(excludePaths: string[] = []) {
@@ -741,8 +743,8 @@ class VFS {
     const walk = (dir: string) => {
       const entries = fs.readdirSync(dir);
       for (const entry of entries) {
-        const fullPath = this.normalize(`${dir === '/' ? '' : dir}/${entry}`);
-        if (excludePaths.some(p => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + '/'))) continue;
+        const fullPath = this.normalize(`${dir === "/" ? "" : dir}/${entry}`);
+        if (excludePaths.some((p) => fullPath === this.normalize(p) || fullPath.startsWith(this.normalize(p) + "/"))) continue;
 
         const stats = fs.statSync(fullPath);
         if (stats.isDirectory()) {
@@ -755,12 +757,12 @@ class VFS {
         }
       }
     };
-    walk('/');
-    this.notifyChange('/');
+    walk("/");
+    this.notifyChange("/");
   }
 
   async factoryReset() {
-    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+    if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.getDirectory) {
       try {
         const root = await navigator.storage.getDirectory();
         // @ts-ignore
@@ -769,8 +771,8 @@ class VFS {
         }
       } catch {}
     }
-    
-    if (typeof indexedDB !== 'undefined') {
+
+    if (typeof indexedDB !== "undefined") {
       try {
         const dbs = await indexedDB.databases();
         for (const db of dbs) {
@@ -784,13 +786,10 @@ class VFS {
 
   isMountPoint(path: string): boolean {
     const normalized = this.normalize(path);
-    const parts = normalized.split('/').filter(Boolean);
+    const parts = normalized.split("/").filter(Boolean);
     const name = parts[0];
-    
-    return parts.length === 1 && 
-           name !== 'home' && 
-           name !== 'System' && 
-           this.mountPoints.has(name);
+
+    return parts.length === 1 && name !== "home" && name !== "System" && this.mountPoints.has(name);
   }
 
   getVolumeLabel(name: string): string {
@@ -798,16 +797,16 @@ class VFS {
   }
 
   private normalize(path: string): string {
-    let p = path.replace(/\\/g, '/');
-    if (p.startsWith('C:')) p = p.slice(2);
-    if (!p.startsWith('/')) p = '/' + p;
-    if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
+    let p = path.replace(/\\/g, "/");
+    if (p.startsWith("C:")) p = p.slice(2);
+    if (!p.startsWith("/")) p = "/" + p;
+    if (p.endsWith("/") && p.length > 1) p = p.slice(0, -1);
     return p;
   }
 
   private notifyChange(path: string) {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vfs-change', { detail: { path } }));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("vfs-change", { detail: { path } }));
     }
   }
 }

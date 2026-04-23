@@ -71,6 +71,16 @@ class BootSequencer {
     });
 
     this.registerTask({
+      id: "bundled-apps-init",
+      stage: BootStage.SERVICES,
+      description: "Loading Bundled Applications...",
+      execute: async () => {
+        const { windowManagerService } = await import('./window-manager-service');
+        await windowManagerService.init();
+      },
+    });
+
+    this.registerTask({
       id: "database-init",
       stage: BootStage.SERVICES,
       description: "Starting Database Engine...",
@@ -103,13 +113,8 @@ class BootSequencer {
 
         if (!Array.isArray(startupApps) || startupApps.length === 0) return;
 
-        window.setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent('ameros-startup-apps', {
-              detail: startupApps,
-            }),
-          );
-        }, 0);
+        // Store startup apps for WindowManager to launch on mount
+        await registry.set('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartupAppsToLaunch', startupApps);
       },
     });
   }

@@ -43,7 +43,6 @@ class Registry {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
   private readonly SYSTEM_DIR = "/System/config";
-  private readonly HIVE_PATH = "/System/config/SYSTEM.reg";
 
   async init() {
     if (this.isInitialized) return;
@@ -237,22 +236,27 @@ class Registry {
 
   private async loadHiveRaw(): Promise<RegistryNode[]> {
     try {
-      if (!(await vfs.exists(this.HIVE_PATH))) return this.getDefaultHive();
-      const content = await vfs.readFile(this.HIVE_PATH);
-      const text = typeof content === 'string' ? content : await (content as Blob).text();
-      const parsed = JSON.parse(text);
-
-      if (Array.isArray(parsed) && parsed.every((node) => this.isRegistryNode(node))) {
-        return parsed as RegistryNode[];
+      const hive: RegistryNode[] = [];
+      const files = await vfs.ls(this.SYSTEM_DIR, { types: "file", depth: 1 });
+      for (const file of files) {
+        if (file.name.endsWith('.reg')) {
+          const path = `${this.SYSTEM_DIR}/${file.name}`;
+          const content = await vfs.readFile(path);
+          const text = typeof content === 'string' ? content : await (content as Blob).text();
+          const node = JSON.parse(text);
+          if (this.isRegistryNode(node)) {
+            hive.push(node);
+          } else {
+            console.warn(`Registry: Skipping invalid hive file ${path}`);
+          }
+        }
       }
-
-      if (parsed && typeof parsed === 'object') {
-        return this.migrateLegacyHive(parsed as Record<string, RegistryValue>);
+      if (hive.length > 0) {
+        return hive;
       }
-
       return this.getDefaultHive();
     } catch (e) {
-      console.error("Registry: Hive corrupted. AmerOS may fail to boot.", e);
+      console.error("Registry: Hive corrupted or invalid JSON. Falling back to defaults.", e);
       return this.getDefaultHive();
     }
   }
@@ -263,8 +267,23 @@ class Registry {
   }
 
   private async saveHiveRaw(data: RegistryNode[]): Promise<void> {
-    const content = JSON.stringify(data, null, 2);
-    await vfs.writeFile(this.HIVE_PATH, content);
+    await vfs.mkdir(this.SYSTEM_DIR);
+
+    const existingFiles = await vfs.ls(this.SYSTEM_DIR, { types: "file", depth: 1 });
+    const savedFileNames = new Set<string>();
+
+    for (const node of data) {
+      const content = JSON.stringify(node, null, 2);
+      const path = `${this.SYSTEM_DIR}/${node.name}.reg`;
+      await vfs.writeFile(path, content);
+      savedFileNames.add(`${node.name}.reg`);
+    }
+
+    for (const file of existingFiles) {
+      if (file.name.endsWith('.reg') && !savedFileNames.has(file.name)) {
+        await vfs.delete(`${this.SYSTEM_DIR}/${file.name}`);
+      }
+    }
   }
 
   private flattenHive(nodes: RegistryNode[], parentPath = ""): Record<string, RegistryValue> {
@@ -474,7 +493,7 @@ class Registry {
 
   /** Groundwork for Setup/Recovery: Wipes the system hive */
   async factoryReset() {
-    await vfs.delete(this.HIVE_PATH);
+    await vfs.delete(this.SYSTEM_DIR);
     window.location.reload();
   }
 }
