@@ -98,7 +98,38 @@
   {
     "name": "HKEY_CURRENT_USER",
     "type": "key",
-    "content": []
+    "content": [
+      {
+        "name": "SOFTWARE",
+        "type": "key",
+        "content": [
+          {
+            "name": "AmerOS",
+            "type": "key",
+            "content": [
+              {
+                "name": "Startup",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "default",
+                    "type": "object",
+                    "content": [
+                      {
+                        "component": "PDFViewer",
+                        "launchArgs": {
+                          "filePath": "/home/Amer Hanna Dev CV.pdf"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
   },
   {
     "name": "HKEY_LOCAL_MACHINE",

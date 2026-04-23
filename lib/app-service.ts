@@ -1,7 +1,7 @@
 "use client"
 
 import { registry } from './registry';
-import type { StartMenuItem, InstalledApp } from '@/types/window';
+import type { StartMenuItem, InstalledApp, StartupAppEntry } from '@/types/window';
 
 /**
  * AppService - Manage system-wide application installation and registration.
@@ -10,6 +10,7 @@ import type { StartMenuItem, InstalledApp } from '@/types/window';
 class AppService {
   private readonly INSTALLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps';
   private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
+  private readonly STARTUP_KEY = 'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup';
 
   /**
    * Registers a new application in the system registry.
@@ -94,6 +95,23 @@ class AppService {
     }
     
     return apps;
+  }
+
+  async listStartupApps(): Promise<StartupAppEntry[]> {
+    return await registry.get<StartupAppEntry[]>(this.STARTUP_KEY, []);
+  }
+
+  async setStartupApps(entries: StartupAppEntry[]) {
+    await registry.set(this.STARTUP_KEY, entries);
+  }
+
+  async addStartupApp(entry: StartupAppEntry) {
+    const entries = await this.listStartupApps();
+    await this.setStartupApps([...entries, entry]);
+  }
+
+  async clearStartupApps() {
+    await this.setStartupApps([]);
   }
 }
 

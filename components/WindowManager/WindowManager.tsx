@@ -166,6 +166,50 @@ export default function WindowManager({ children, applicationRegistry = {} }: Wi
   const engine = useWindowEngine(applicationRegistry);
   const [isSplashFinished, setIsSplashFinished] = useState(false);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const normalizeLaunchArgs = (value: any): any => {
+      if (value === undefined || value === null) return null;
+      if (Array.isArray(value)) return value.map(normalizeLaunchArgs);
+      if (typeof value === 'object') {
+        return Object.keys(value)
+          .sort()
+          .reduce((acc, key) => {
+            acc[key] = normalizeLaunchArgs(value[key]);
+            return acc;
+          }, {} as Record<string, any>);
+      }
+      return value;
+    };
+
+    const sameLaunchArgs = (a: any, b: any) =>
+      JSON.stringify(normalizeLaunchArgs(a)) === JSON.stringify(normalizeLaunchArgs(b));
+
+    const handleStartupApps = (event: Event) => {
+      const startupApps = (event as CustomEvent<Record<string, any>[]>).detail;
+      if (!Array.isArray(startupApps)) return;
+
+      startupApps.forEach((app) => {
+        if (typeof app?.component !== 'string') return;
+
+        const normalizedArgs = normalizeLaunchArgs(app.launchArgs);
+        const alreadyOpen = engine.windows.some((w) =>
+          w.appId === app.component && sameLaunchArgs(w.launchArgs, normalizedArgs),
+        );
+
+        if (!alreadyOpen) {
+          engine.launchApp(app.component, {
+            launchArgs: app.launchArgs,
+          });
+        }
+      });
+    };
+
+    window.addEventListener('ameros-startup-apps', handleStartupApps as EventListener);
+    return () => window.removeEventListener('ameros-startup-apps', handleStartupApps as EventListener);
+  }, [engine.launchApp, engine.windows]);
+
   return (
     <SystemActionsContext.Provider value={{ launchApp: engine.launchApp }}>
       <DesktopContent 

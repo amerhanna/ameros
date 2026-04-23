@@ -3,6 +3,7 @@
 import { vfs } from "./vfs";
 import { registry } from "./registry";
 import { dbService } from "./database";
+import type { StartupAppEntry } from '@/types/window';
 
 /**
  * Defines the critical startup phases of AmerOS.
@@ -85,6 +86,30 @@ class BootSequencer {
       execute: async () => {
         // Placeholder: Load desktop background, Start Menu items, and App associations
         // const theme = await registry.get('HKEY_CURRENT_USER/Control Panel/Desktop/Wallpaper', 'default');
+      },
+    });
+
+    this.registerTask({
+      id: "startup-apps",
+      stage: BootStage.SHELL,
+      description: "Launching startup applications...",
+      execute: async () => {
+        if (typeof window === 'undefined') return;
+
+        const startupApps = await registry.get<StartupAppEntry[]>(
+          'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup',
+          [],
+        );
+
+        if (!Array.isArray(startupApps) || startupApps.length === 0) return;
+
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('ameros-startup-apps', {
+              detail: startupApps,
+            }),
+          );
+        }, 0);
       },
     });
   }

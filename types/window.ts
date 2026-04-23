@@ -74,6 +74,11 @@ export interface Application {
 
 export type ApplicationRegistry = Record<string, Application>
 
+export interface StartupAppEntry {
+  component: string
+  launchArgs?: Record<string, any>
+}
+
 export interface InstalledApp {
   id: string; // Internal key name (e.g. unique slug or hostname)
   label: string;
