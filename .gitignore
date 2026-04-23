@@ -20,4 +20,3 @@ lerna-debug.log*
 .next
 .vercel
 .env
-lib/vfs-defaults/manifest.json
