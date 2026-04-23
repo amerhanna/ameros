@@ -51,59 +51,64 @@ class VFS {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      // 1. Request persistence
-      if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
-        try {
-          await navigator.storage.persist();
-        } catch (err) {
-          console.warn('VFS: Storage persistence request failed', err);
-        }
-      }
-
-      // 2. Configure ZenFS
-      // We prioritize OPFS (WebAccess) but fallback to IndexedDB if unavailable
       try {
-        let opfsHandle: any = null;
-        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+        // 1. Request persistence
+        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
           try {
-            opfsHandle = await navigator.storage.getDirectory();
+            await navigator.storage.persist();
           } catch (err) {
-            console.warn('VFS: Failed to get OPFS directory handle', err);
+            console.warn('VFS: Storage persistence request failed', err);
           }
         }
 
-        if (opfsHandle) {
+        // 2. Configure ZenFS
+        // We prioritize OPFS (WebAccess) but fallback to IndexedDB if unavailable
+        try {
+          let opfsHandle: any = null;
+          if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory) {
+            try {
+              opfsHandle = await navigator.storage.getDirectory();
+            } catch (err) {
+              console.warn('VFS: Failed to get OPFS directory handle', err);
+            }
+          }
+
+          if (opfsHandle) {
+            await configure({
+              mounts: {
+                '/': { backend: WebAccess, handle: opfsHandle },
+                '/System': IndexedDB,
+                '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
+              }
+            });
+          } else {
+            throw new Error('OPFS not available');
+          }
+        } catch (err) {
+          console.warn('VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root', err);
           await configure({
             mounts: {
-              '/': { backend: WebAccess, handle: opfsHandle },
+              '/': IndexedDB,
               '/System': IndexedDB,
               '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
             }
           });
-        } else {
-          throw new Error('OPFS not available');
         }
+
+        // 3. Seed Defaults
+        await this.seedDefaults();
+  
+        // 4. Data Migration (Optional)
+        await this.migrateLegacyData();
+  
+        // 5. Load saved mounts (Background - Non-blocking)
+        this.restoreMounts().catch(err => console.warn('VFS: Background mount restoration failed', err));
+
+        console.log('VFS: ZenFS initialized at root (/)');
       } catch (err) {
-        console.warn('VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root', err);
-        await configure({
-          mounts: {
-            '/': IndexedDB,
-            '/System': IndexedDB,
-            '/System/mnt': { backend: IndexedDB, storeName: 'external_mounts' }
-          }
-        });
+        this.initPromise = null;
+        throw err;
       }
-
-      // 3. Seed Defaults
-      await this.seedDefaults();
- 
-      // 4. Data Migration (Optional)
-      await this.migrateLegacyData();
- 
-      // 5. Load saved mounts (Background - Non-blocking)
-      this.restoreMounts().catch(err => console.warn('VFS: Background mount restoration failed', err));
-
-      console.log('VFS: ZenFS initialized at root (/)');
     })();
 
     return this.initPromise;
@@ -139,18 +144,18 @@ class VFS {
 
         try {
           if (node.type === 'dir') {
-            if (!fs.existsSync(newPath)) fs.mkdirSync(newPath, { recursive: true });
+            if (!(await this.pathExists(newPath))) await fs.promises.mkdir(newPath, { recursive: true });
           } else {
             const parentDir = newPath.substring(0, newPath.lastIndexOf('/'));
-            if (parentDir && parentDir !== '' && !fs.existsSync(parentDir)) {
-              fs.mkdirSync(parentDir, { recursive: true });
+            if (parentDir && parentDir !== '' && !(await this.pathExists(parentDir))) {
+              await fs.promises.mkdir(parentDir, { recursive: true });
             }
             
             let content = node.content;
             if (content instanceof Blob) {
               content = new Uint8Array(await content.arrayBuffer());
             }
-            fs.writeFileSync(newPath, content || new Uint8Array());
+            await fs.promises.writeFile(newPath, content || new Uint8Array());
           }
         } catch (err) {
           console.warn(`VFS: Migration failed for ${node.path}:`, err);
@@ -175,26 +180,26 @@ class VFS {
       // 1. Ensure core system directories exist
       const coreDirs = ['/home', '/System', SYSTEM_MOUNTS_DIR];
       for (const dir of coreDirs) {
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        if (!(await this.pathExists(dir))) {
+          await fs.promises.mkdir(dir, { recursive: true });
         }
       }
 
       // 2. Seed from manifest
       for (const folder of defaultVfs.folders) {
-        if (!fs.existsSync(folder)) {
-          fs.mkdirSync(folder, { recursive: true });
+        if (!(await this.pathExists(folder))) {
+          await fs.promises.mkdir(folder, { recursive: true });
         }
       }
 
       for (const file of defaultVfs.files) {
         const path = '/' + file.relativePath;
-        if (!fs.existsSync(path)) {
+        if (!(await this.pathExists(path))) {
           try {
             // Check if parent directory exists
             const parent = path.substring(0, path.lastIndexOf('/'));
-            if (parent && !fs.existsSync(parent)) {
-              fs.mkdirSync(parent, { recursive: true });
+            if (parent && !(await this.pathExists(parent))) {
+              await fs.promises.mkdir(parent, { recursive: true });
             }
 
             // Decode base64 content
@@ -204,7 +209,7 @@ class VFS {
               bytes[i] = binaryString.charCodeAt(i);
             }
             
-            fs.writeFileSync(path, bytes);
+            await fs.promises.writeFile(path, bytes);
           } catch (err) {
             console.warn(`VFS: Failed to seed file ${path}:`, err);
           }
@@ -212,6 +217,15 @@ class VFS {
       }
     } catch (err) {
       console.error('VFS: Seeding failed', err);
+    }
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    try {
+      await fs.promises.stat(path);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -235,8 +249,8 @@ class VFS {
 
   private async restoreMounts() {
     try {
-      if (!fs.existsSync(SYSTEM_MOUNTS_DIR)) {
-        fs.mkdirSync(SYSTEM_MOUNTS_DIR, { recursive: true });
+      if (!(await this.pathExists(SYSTEM_MOUNTS_DIR))) {
+        await fs.promises.mkdir(SYSTEM_MOUNTS_DIR, { recursive: true });
       }
 
       // 1. Get handles from IndexedDB
@@ -257,7 +271,7 @@ class VFS {
       try {
         const config = await resolveMountConfig({ backend: WebAccess, handle });
         
-        if (!fs.existsSync(mountPath)) fs.mkdirSync(mountPath, { recursive: true });
+        if (!(await this.pathExists(mountPath))) await fs.promises.mkdir(mountPath, { recursive: true });
         
         try {
           fs.mount(mountPath, config);
