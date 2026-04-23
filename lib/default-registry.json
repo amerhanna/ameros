@@ -150,7 +150,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "DeepSeekHistory", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                  "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -219,14 +219,6 @@
                     ]
                   },
                   {
-                    "name": "DeepSeekHistory",
-                    "type": "key",
-                    "content": [
-                      { "name": "label", "type": "string", "content": "History Explorer" },
-                      { "name": "component", "type": "string", "content": "DeepSeekHistory" }
-                    ]
-                  },
-                  {
                     "name": "TestClose",
                     "type": "key",
                     "content": [
@@ -284,6 +276,154 @@
                       { "name": "type", "type": "string", "content": "action" },
                       { "name": "icon", "type": "string", "content": "🔌" },
                       { "name": "actionId", "type": "string", "content": "shutdown" }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Applications",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "TextEditor",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📄" },
+                      { "name": "width", "type": "number", "content": 500 },
+                      { "name": "height", "type": "number", "content": 350 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "minWidth", "type": "number", "content": 300 },
+                      { "name": "minHeight", "type": "number", "content": 200 },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Calculator",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🧮" },
+                      { "name": "width", "type": "number", "content": 250 },
+                      { "name": "height", "type": "number", "content": 310 },
+                      { "name": "resizable", "type": "boolean", "content": false },
+                      { "name": "maximizable", "type": "boolean", "content": false }
+                    ]
+                  },
+                  {
+                    "name": "FileExplorer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📁" },
+                      { "name": "width", "type": "number", "content": 600 },
+                      { "name": "height", "type": "number", "content": 400 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "minWidth", "type": "number", "content": 300 },
+                      { "name": "minHeight", "type": "number", "content": 200 }
+                    ]
+                  },
+                  {
+                    "name": "DemoApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🎨" },
+                      { "name": "width", "type": "number", "content": 400 },
+                      { "name": "height", "type": "number", "content": 300 },
+                      { "name": "resizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Settings",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "⚙️" },
+                      { "name": "width", "type": "number", "content": 600 },
+                      { "name": "height", "type": "number", "content": 500 },
+                      { "name": "resizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "TestCloseApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🧪" },
+                      { "name": "width", "type": "number", "content": 400 },
+                      { "name": "height", "type": "number", "content": 300 },
+                      { "name": "resizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "CommonDialogDemo",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📦" },
+                      { "name": "width", "type": "number", "content": 320 },
+                      { "name": "height", "type": "number", "content": 400 },
+                      { "name": "resizable", "type": "boolean", "content": false },
+                      { "name": "maximizable", "type": "boolean", "content": false }
+                    ]
+                  },
+                  {
+                    "name": "WebApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🌐" },
+                      { "name": "width", "type": "number", "content": 1000 },
+                      { "name": "height", "type": "number", "content": 700 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Installer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🛠️" },
+                      { "name": "width", "type": "number", "content": 900 },
+                      { "name": "height", "type": "number", "content": 700 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Regedit",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🔧" },
+                      { "name": "width", "type": "number", "content": 800 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Notes",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📝" },
+                      { "name": "width", "type": "number", "content": 400 },
+                      { "name": "height", "type": "number", "content": 500 },
+                      { "name": "resizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "DBExplorer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "💽" },
+                      { "name": "width", "type": "number", "content": 900 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "PDFViewer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📕" },
+                      { "name": "width", "type": "number", "content": 800 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
                     ]
                   }
                 ]

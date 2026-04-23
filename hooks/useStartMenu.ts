@@ -6,7 +6,7 @@ import { registry } from '@/lib/registry';
 
 const START_MENU_PATH = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu';
 
-export function useStartMenu() {
+export function useStartMenu(additionalStartMenuItems: StartMenuItem[] = []) {
   const [startMenuItems, setStartMenuItems] = useState<StartMenuItem[]>([]);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
 
@@ -76,10 +76,28 @@ export function useStartMenu() {
     };
   }, [fetchMenuRecursive]);
 
-  const combinedStartMenuItems = useMemo(
-    () => startMenuItems,
-    [startMenuItems],
-  );
+  const combinedStartMenuItems = useMemo(() => {
+    // Merge additional items into Programs submenu
+    const mergeIntoPrograms = (items: StartMenuItem[]): StartMenuItem[] => {
+      return items.map(item => {
+        if (item.type === 'submenu' && item.label === 'Programs') {
+          return {
+            ...item,
+            items: [...item.items, ...additionalStartMenuItems]
+          };
+        }
+        if (item.type === 'submenu') {
+          return {
+            ...item,
+            items: mergeIntoPrograms(item.items)
+          };
+        }
+        return item;
+      });
+    };
+
+    return mergeIntoPrograms(startMenuItems);
+  }, [startMenuItems, additionalStartMenuItems]);
 
   const toggleStartMenu = useCallback(() => {
     setIsStartMenuOpen((prev) => !prev);

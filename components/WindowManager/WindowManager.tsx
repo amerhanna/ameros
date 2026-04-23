@@ -13,11 +13,14 @@ import { useWindowEngine } from "@/hooks/useWindowEngine";
 import { useStartMenu } from "@/hooks/useStartMenu";
 import { useDesktopContextMenu } from "@/hooks/useDesktopContextMenu";
 import { useMessageBox } from "@/hooks/useMessageBox";
+import { registry } from "@/lib/registry";
+import { bundledComponents, bundledHandlers } from "@/lib/bundled-apps";
 
 /** Core props configuring the base desktop shell environment. */
 interface WindowManagerProps {
   children?: React.ReactNode;
   applicationRegistry?: ApplicationRegistry;
+  additionalStartMenuItems?: StartMenuItem[];
 }
 
 /**
@@ -30,12 +33,14 @@ function DesktopContent({
   engine,
   mounted,
   isSplashFinished,
-  setIsSplashFinished
+  setIsSplashFinished,
+  additionalStartMenuItems
 }: WindowManagerProps & { 
   engine: ReturnType<typeof useWindowEngine>,
   mounted: boolean,
   isSplashFinished: boolean,
-  setIsSplashFinished: (v: boolean) => void
+  setIsSplashFinished: (v: boolean) => void,
+  additionalStartMenuItems: StartMenuItem[]
 }) {
   const {
     windows,
@@ -70,7 +75,7 @@ function DesktopContent({
     });
   }, [setOnLaunchError, showMessageBox]);
 
-  const { combinedStartMenuItems, isStartMenuOpen, toggleStartMenu, closeStartMenu } = useStartMenu();
+  const { combinedStartMenuItems, isStartMenuOpen, toggleStartMenu, closeStartMenu } = useStartMenu(additionalStartMenuItems);
   const { contextMenu, openWindowMenu, closeWindowMenu } = useDesktopContextMenu();
 
   const selectedWindow = useMemo(() => windows.find((w) => w.id === contextMenu.windowId), [windows, contextMenu.windowId]);
@@ -162,8 +167,51 @@ function DesktopContent({
  * Windows, the global transparent Context menus, the Taskbar, and the Start Menu.
  * Handles the splash screen mounting logic sequence globally.
  */
-export default function WindowManager({ children, applicationRegistry = {} }: WindowManagerProps) {
-  const engine = useWindowEngine(applicationRegistry);
+export default function WindowManager({ children, applicationRegistry = {}, additionalStartMenuItems = [] }: WindowManagerProps) {
+  const [loadedApplicationRegistry, setLoadedApplicationRegistry] = useState<ApplicationRegistry>({});
+
+  // Load bundled applications from registry
+  useEffect(() => {
+    async function loadBundledApps() {
+      try {
+        const appsPath = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
+        const appKeys = await registry.getKeys(appsPath);
+        const loaded: ApplicationRegistry = {};
+
+        for (const appKey of appKeys) {
+          const appPath = `${appsPath}/${appKey}`;
+          const values = await registry.getValues(appPath);
+          
+          loaded[appKey] = {
+            component: bundledComponents[appKey],
+            icon: values.icon as string || '❓',
+            width: values.width as number || 400,
+            height: values.height as number || 300,
+            resizable: values.resizable as boolean ?? true,
+            maximizable: values.maximizable as boolean ?? true,
+            minimizable: values.minimizable as boolean ?? true,
+            minWidth: values.minWidth as number,
+            minHeight: values.minHeight as number,
+            ...bundledHandlers[appKey], // Merge special handlers
+          };
+        }
+
+        setLoadedApplicationRegistry(loaded);
+      } catch (error) {
+        console.error('Failed to load bundled applications from registry:', error);
+      }
+    }
+
+    loadBundledApps();
+  }, []);
+
+  // Merge loaded registry apps with prop apps
+  const mergedApplicationRegistry = useMemo(() => ({
+    ...loadedApplicationRegistry,
+    ...applicationRegistry,
+  }), [loadedApplicationRegistry, applicationRegistry]);
+
+  const engine = useWindowEngine(mergedApplicationRegistry);
   const [isSplashFinished, setIsSplashFinished] = useState(false);
 
   useEffect(() => {
@@ -213,11 +261,12 @@ export default function WindowManager({ children, applicationRegistry = {} }: Wi
   return (
     <SystemActionsContext.Provider value={{ launchApp: engine.launchApp }}>
       <DesktopContent 
-        applicationRegistry={applicationRegistry} 
+        applicationRegistry={mergedApplicationRegistry} 
         engine={engine}
         mounted={engine.mounted}
         isSplashFinished={isSplashFinished}
         setIsSplashFinished={setIsSplashFinished}
+        additionalStartMenuItems={additionalStartMenuItems}
       >
         {children}
       </DesktopContent>
