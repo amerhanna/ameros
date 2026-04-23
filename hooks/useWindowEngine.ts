@@ -108,7 +108,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
   const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
   const openWindow = useCallback(
-    (config: Partial<WindowConfig> & { component: string | React.ComponentType<any> }) => {
+    (config: Omit<Partial<WindowConfig>, 'component'> & { component: string | React.ComponentType<any> }) => {
       const isFunctional = typeof config.component !== "string";
       let componentId = isFunctional ? `__functional__${Date.now()}_${Math.random().toString(36).substring(2, 7)}` : (config.component as string);
 

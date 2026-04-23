@@ -15,7 +15,7 @@ import { useDesktopContextMenu } from "@/hooks/useDesktopContextMenu";
 import { useMessageBox } from "@/hooks/useMessageBox";
 import { registry } from "@/lib/registry";
 import type { StartupAppEntry } from '@/types/window';
-import { windowManagerService } from "@/lib/window-manager-service";
+import { appService } from "@/lib/app-service";
 
 /** Core props configuring the base desktop shell environment. */
 interface WindowManagerProps {
@@ -169,20 +169,20 @@ function DesktopContent({
  * Handles the splash screen mounting logic sequence globally.
  */
 export default function WindowManager({ children, applicationRegistry = {}, additionalStartMenuItems = [] }: WindowManagerProps) {
-  const [bundledApps, setBundledApps] = useState<ApplicationRegistry>(windowManagerService.getApplicationRegistry());
+  const [bundledApps, setBundledApps] = useState<ApplicationRegistry>(appService.getApplicationRegistry());
   const [isServiceReady, setIsServiceReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    windowManagerService.waitUntilReady()
+    appService.waitUntilReady()
       .then(() => {
         if (!isMounted) return;
-        setBundledApps(windowManagerService.getApplicationRegistry());
+        setBundledApps(appService.getApplicationRegistry());
         setIsServiceReady(true);
       })
       .catch((error) => {
-        console.error('WindowManager service failed to initialize:', error);
+        console.error('App service failed to initialize:', error);
       });
 
     return () => {

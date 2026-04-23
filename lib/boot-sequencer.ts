@@ -3,6 +3,7 @@
 import { vfs } from "./vfs";
 import { registry } from "./registry";
 import { dbService } from "./database";
+import { appService } from "./app-service";
 import type { StartupAppEntry } from '@/types/window';
 
 /**
@@ -75,8 +76,7 @@ class BootSequencer {
       stage: BootStage.SERVICES,
       description: "Loading Bundled Applications...",
       execute: async () => {
-        const { windowManagerService } = await import('./window-manager-service');
-        await windowManagerService.init();
+        await appService.init();
       },
     });
 

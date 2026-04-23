@@ -1,16 +1,22 @@
 "use client"
 
 import { registry } from './registry';
-import type { StartMenuItem, InstalledApp, StartupAppEntry } from '@/types/window';
+import type { StartMenuItem, InstalledApp, StartupAppEntry, ApplicationRegistry } from '@/types/window';
+import { loadBundledApps } from './bundled-apps';
 
 /**
  * AppService - Manage system-wide application installation and registration.
  * Handles persisting app metadata to the Registry and managing Start Menu entries.
+ * Also manages the application registry for bundled applications.
  */
 class AppService {
   private readonly INSTALLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps';
   private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
   private readonly STARTUP_KEY = 'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup';
+
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
+  private applicationRegistry: ApplicationRegistry = {};
 
   /**
    * Registers a new application in the system registry.
@@ -112,6 +118,50 @@ class AppService {
 
   async clearStartupApps() {
     await this.setStartupApps([]);
+  }
+
+  /**
+   * Initialize the service by loading bundled applications.
+   */
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      this.applicationRegistry = await loadBundledApps();
+      this.initialized = true;
+    })();
+
+    return this.initPromise;
+  }
+
+  /**
+   * Await service readiness.
+   */
+  async waitUntilReady(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initPromise) {
+      await this.init();
+      return;
+    }
+    await this.initPromise;
+  }
+
+  /**
+   * Get the current application registry.
+   */
+  getApplicationRegistry(): ApplicationRegistry {
+    return this.applicationRegistry;
+  }
+
+  /**
+   * Merge additional applications into the registry.
+   */
+  mergeApplications(additional: ApplicationRegistry): ApplicationRegistry {
+    return {
+      ...this.applicationRegistry,
+      ...additional,
+    };
   }
 }
 
