@@ -10,10 +10,10 @@ interface StartMenuProps {
   onClose: () => void
   onOpenWindow: (config: Partial<WindowConfig> & { component: string }) => void
   items: StartMenuItem[]
-  applicationRegistry: ApplicationRegistry
+  applicationRegistry?: ApplicationRegistry
 }
 
-function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps["onOpenWindow"], applicationRegistry: ApplicationRegistry): MenuItemType[] {
+function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps["onOpenWindow"], applicationRegistry?: ApplicationRegistry): MenuItemType[] {
   return items.map((item) => {
     if (item.type === "separator") {
       return { type: "separator" }
@@ -45,7 +45,7 @@ function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps[
     return {
       type: "item",
       label: item.label,
-      icon: applicationRegistry[item.component]?.icon,
+      icon: applicationRegistry?.[item.component]?.icon,
       action: () => onOpenWindow({ component: item.component, launchArgs: item.launchArgs }),
     }
   })

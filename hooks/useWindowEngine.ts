@@ -47,8 +47,13 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
   const [mounted, setMounted] = useState(false);
   const beforeCloseHandlersRef = useRef<Record<string, () => boolean | Promise<boolean>>>({});
   const childComponentsRef = useRef<Record<string, React.ComponentType<any>>>({});
+  const onLaunchErrorRef = useRef<(component: string, launchArgs?: Record<string, any>) => void>(null);
   const persistentRef = useRef(persistentWindows);
   persistentRef.current = persistentWindows;
+
+  const setOnLaunchError = useCallback((fn: (component: string, launchArgs?: Record<string, any>) => void) => {
+    onLaunchErrorRef.current = fn;
+  }, []);
 
   const managerSnap = useSyncExternalStore(
     subscribeWindowStore,
@@ -103,23 +108,31 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
   const effectiveActiveWindowId = mounted ? activeWindowId : null;
 
   const openWindow = useCallback(
-    (config: Partial<WindowConfig> & { component: string }) => {
-      const isChildWindow = config.childWindow;
-      const app = isChildWindow ? null : applicationRegistry[config.component];
+    (config: Partial<WindowConfig> & { component: string | React.ComponentType<any> }) => {
+      const isFunctional = typeof config.component !== "string";
+      let componentId = isFunctional ? `__functional__${Date.now()}_${Math.random().toString(36).substring(2, 7)}` : (config.component as string);
 
-      if (!isChildWindow && !app) {
-        console.error(`Application ${config.component} not found in registry`);
+      const isChildWindow = config.childWindow;
+      const app = (isChildWindow || isFunctional) ? null : applicationRegistry[componentId];
+
+      if (!isChildWindow && !isFunctional && !app) {
+        console.error(`Application ${componentId} not found in registry`);
+        onLaunchErrorRef.current?.(componentId, config.launchArgs);
         return null;
       }
 
       const id = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      if (isFunctional) {
+        childComponentsRef.current[id] = config.component as React.ComponentType<any>;
+      }
+
       setWindowsState((prev) => {
         const newWindow: PersistentWindowState = {
           id,
-          appId: config.component,
-          title: config.title || config.component,
-          component: config.component,
+          appId: componentId,
+          title: config.title || componentId,
+          component: componentId,
           width: config.width || app?.width || 400,
           height: config.height || app?.height || 300,
           x: config.x ?? (100 + (prev.length * 20) % 200),
@@ -136,7 +149,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
           minimizable: config.minimizable ?? app?.minimizable ?? true,
           modal: config.modal,
           parentWindowId: config.parentWindowId,
-          childWindow: config.childWindow,
+          childWindow: config.childWindow || isFunctional,
           originalWidth: config.width || app?.width || 400,
           originalHeight: config.height || app?.height || 300,
           originalX: config.x ?? 100,
@@ -190,7 +203,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
   );
 
   const launchApp = useCallback(
-    (component: string, config?: Partial<WindowConfig>) => {
+    (component: string | React.ComponentType<any>, config?: Partial<WindowConfig>) => {
       return openWindow({
         component,
         ...config,
@@ -391,5 +404,6 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
     resizeWindow,
     handleTaskbarWindowSelect,
     blockedWindowIds,
+    setOnLaunchError,
   };
 }

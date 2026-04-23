@@ -34,6 +34,7 @@ export interface BootTask {
 class BootSequencer {
   private tasks: BootTask[] = [];
   public isBooted = false;
+  private executePromise: Promise<void> | null = null;
 
   constructor() {
     this.registerCoreTasks();
@@ -98,18 +99,23 @@ class BootSequencer {
    */
   async executeBootSequence(onProgress: (desc: string) => void): Promise<void> {
     if (this.isBooted) return;
+    if (this.executePromise) return this.executePromise;
 
-    for (const task of this.tasks) {
-      onProgress(task.description);
-      try {
-        await task.execute();
-      } catch (error) {
-        console.error(`[BootSequencer] Critical failure in task '${task.id}':`, error);
-        throw new Error(`Boot failed at: ${task.description}\n\nTechnical details:\n${error}`);
+    this.executePromise = (async () => {
+      for (const task of this.tasks) {
+        onProgress(task.description);
+        try {
+          await task.execute();
+        } catch (error) {
+          this.executePromise = null;
+          console.error(`[BootSequencer] Critical failure in task '${task.id}':`, error);
+          throw new Error(`Boot failed at: ${task.description}\n\nTechnical details:\n${error}`);
+        }
       }
-    }
+      this.isBooted = true;
+    })();
 
-    this.isBooted = true;
+    return this.executePromise;
   }
 }
 

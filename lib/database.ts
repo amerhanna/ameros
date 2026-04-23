@@ -10,6 +10,8 @@ import { vfs } from './vfs';
 class DatabaseService {
   private static instance: DatabaseService;
   private connectionPromises: Record<string, Promise<void>> = {};
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -25,16 +27,29 @@ class DatabaseService {
    * within the Virtual File System for application data persistence.
    */
   public async init(): Promise<void> {
-    const sysDir = '/System';
-    const appDataDir = '/System/AppData';
+    if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
 
-    if (!(await vfs.exists(sysDir))) {
-      await vfs.mkdir(sysDir);
-    }
-    if (!(await vfs.exists(appDataDir))) {
-      await vfs.mkdir(appDataDir);
-    }
-    DatabaseService.getInstance();
+    this.initPromise = (async () => {
+      try {
+        const sysDir = '/System';
+        const appDataDir = '/System/AppData';
+
+        if (!(await vfs.exists(sysDir))) {
+          await vfs.mkdir(sysDir);
+        }
+        if (!(await vfs.exists(appDataDir))) {
+          await vfs.mkdir(appDataDir);
+        }
+        
+        this.isInitialized = true;
+      } catch (error) {
+        this.initPromise = null;
+        throw error;
+      }
+    })();
+
+    return this.initPromise;
   }
 
   /**

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSystemActions } from '@/hooks/useSystemActions';
 import { useWindowActions } from '@/hooks/useWindowActions';
 import { vfs, type VFSNode, type FolderTreeNode } from '@/lib/vfs';
+import { fileService } from '@/lib/file-service';
 import { type MenuItemType } from '@/components/WindowManager/Menu';
 import ContextMenu from '@/components/WindowManager/ContextMenu';
 import { toast } from 'sonner';
@@ -108,7 +109,9 @@ export default function FileExplorer() {
     if (node.type === 'dir' || node.isMountPoint) {
       navigateTo(node.path);
     } else {
-      if (node.name.toLowerCase().endsWith('.txt')) {
+      const openCommand = await fileService.getOpenFileCommand(node.name);
+      
+      if (openCommand) {
         try {
           const content = await vfs.readFile(node.path);
           const textContent =
@@ -120,18 +123,19 @@ export default function FileExplorer() {
               ? content
               : '';
 
-          launchApp('TextEditor', {
-            title: `${node.name} - Text Editor`,
+          launchApp(openCommand, {
+            title: `${node.name} - ${openCommand}`,
             launchArgs: {
               filePath: node.path,
               initialContent: textContent,
             },
           });
         } catch (err) {
-          toast.error('Failed to read file');
+          toast.error('Failed to open file');
+          console.error(err);
         }
       } else {
-        toast('File type not supported', { description: 'Opening binary files is coming soon!' });
+        toast('File type not supported', { description: 'Opening this file type is coming soon!' });
       }
     }
   };
