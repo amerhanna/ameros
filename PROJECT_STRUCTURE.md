@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-04-18.after-02bcc30.merge-pull-request-8-from-amerhanna-database-service
-> Baseline Commit: 02bcc30
-> Baseline Summary: Merge pull request #8 from amerhanna/database-service
-> Generated At (UTC): 2026-04-18T10:18:00Z
+> Doc Version: 2026-04-23.after-6c9d71f.support-user-startup-apps-on-boot
+> Baseline Commit: 6c9d71f
+> Baseline Summary: Support user startup apps on boot
+> Generated At (UTC): 2026-04-23T00:00:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -33,6 +33,8 @@ This document is versioned against a git commit summary so future agents can jud
     - `Calculator/`: Basic calculator.
     - `DeepSeekHistory/`: DeepSeek Chat History explorer.
     - `WebApp/`: Web view frame container.
+    - `PDFViewer/`: PDF document viewer supporting VFS files and web URLs.
+    - `TestCloseApp/`: Test application for close functionality.
 - [**`components/`**](file:///c:/dev/personal/ameros/components): System-wide UI components.
     - `WindowManager/`: Core logic for `Window`, `WindowManager`, `Taskbar`, `StartMenu`, `MenuBar` and `ContextMenu`. Includes nested submenus support.
     - `SystemDialogs/`: Standard OS dialogs (e.g., `SaveDialog`, `OpenDialog`, `PropertiesDialog`).
@@ -48,12 +50,18 @@ This document is versioned against a git commit summary so future agents can jud
     - `boot-sequencer.ts`: Orchestrates system startup steps (e.g., creating system folders, initializing Registry features, VFS seeding).
     - `window-store.ts`: State management for window positions, focus, and Z-index (uses a custom subscription model).
     - `clipboard.tsx`: System-wide clipboard for file operations (Copy/Cut/Paste).
+    - `app-service.ts`: Manages system-wide application installation, registration, and Start Menu entries via the Registry.
+    - `file-service.ts`: Handles file-to-application associations and icon resolution using the system Registry.
+    - `registry-provider.tsx`: React provider for synchronous access to the registry across the application.
+    - `utils.ts`: Utility functions for the OS.
 - [**`hooks/`**](file:///c:/dev/personal/ameros/hooks): Custom React hooks providing system and UI logic.
     - `useSystemDialogs.tsx`: Manage system dialogs (Open/Save/Properties).
     - `useMessageBox.tsx`: Global message box interface (alert/confirm/error/prompt).
     - `useDatabase.ts`: Allows active applications to safely and simply execute SQL queries through `lib/database.ts`, enforcing bounds dynamically using the caller's WindowContext `appId`.
     - `useWindowEngine.ts`, `useWindowActions.ts`, `useGetWindowState.ts`: Core abstractions to operate the Window manager from child contexts or isolated apps.
     - `useMenuBar.ts`, `useStartMenu.ts`, `useDesktopContextMenu.ts`: Support for application-specific menus, start menu management, and global right-click behaviors.
+    - `useLocalStorage.ts`: Hook for local storage management.
+    - `useSystemActions.ts`: Hook for system actions.
 - [**`types/`**](file:///c:/dev/personal/ameros/types): TypeScript definitions for windows, the VFS, UI menus/submenus, and application registry mapping.
 
 ## Core Concepts
