@@ -1,8 +1,55 @@
 "use client"
 
+import { bundledComponents, bundledHandlers } from './bundled-apps';
 import { registry } from './registry';
 import type { StartMenuItem, InstalledApp, StartupAppEntry, ApplicationRegistry } from '@/types/window';
-import { loadBundledApps } from './bundled-apps';
+
+/**
+ * Global registry for bundled applications, populated during boot.
+ */
+let globalBundledApps: ApplicationRegistry = {};
+
+/**
+ * Load bundled applications from registry and populate global registry.
+ */
+export async function loadBundledApps(): Promise<ApplicationRegistry> {
+  if (Object.keys(globalBundledApps).length > 0) {
+    return globalBundledApps;
+  }
+
+  const { registry } = await import('./registry');
+  const appsPath = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
+  const appKeys = await registry.getKeys(appsPath);
+  const loaded: ApplicationRegistry = {};
+
+  for (const appKey of appKeys) {
+    const appPath = `${appsPath}/${appKey}`;
+    const values = await registry.getValues(appPath);
+    
+    loaded[appKey] = {
+      component: bundledComponents[appKey],
+      icon: values.icon as string || '❓',
+      width: values.width as number || 400,
+      height: values.height as number || 300,
+      resizable: values.resizable as boolean ?? true,
+      maximizable: values.maximizable as boolean ?? true,
+      minimizable: values.minimizable as boolean ?? true,
+      minWidth: values.minWidth as number,
+      minHeight: values.minHeight as number,
+      ...bundledHandlers[appKey], // Merge special handlers
+    };
+  }
+
+  globalBundledApps = loaded;
+  return loaded;
+}
+
+/**
+ * Get the global bundled applications registry.
+ */
+export function getBundledApps(): ApplicationRegistry {
+  return globalBundledApps;
+}
 
 /**
  * AppService - Manage system-wide application installation and registration.
@@ -10,6 +57,7 @@ import { loadBundledApps } from './bundled-apps';
  * Also manages the application registry for bundled applications.
  */
 class AppService {
+  private readonly BUNDLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
   private readonly INSTALLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps';
   private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
   private readonly STARTUP_KEY = 'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup';
