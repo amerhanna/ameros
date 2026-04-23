@@ -14,6 +14,7 @@ import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
 import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
 import Notes from '@/Applications/Notes/Notes';
+import PDFViewer from '@/Applications/PDFViewer/PDFViewer';
 import type { ApplicationRegistry } from '@/types/window';
 
 const applicationRegistry: ApplicationRegistry = {
@@ -119,6 +120,14 @@ const applicationRegistry: ApplicationRegistry = {
     component: DBExplorer,
     icon: '💽',
     width: 900,
+    height: 600,
+    resizable: true,
+    maximizable: true,
+  },
+  PDFViewer: {
+    component: PDFViewer,
+    icon: '📕',
+    width: 800,
     height: 600,
     resizable: true,
     maximizable: true,

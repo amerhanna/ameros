@@ -62,6 +62,36 @@
             ]
           }
         ]
+      },
+      {
+        "name": ".pdf",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "pdffile" }]
+      },
+      {
+        "name": "pdffile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "PDF Document" },
+          { "name": "DefaultIcon", "type": "string", "content": "Book" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "PDFViewer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -89,7 +119,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "DeepSeekHistory", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "DeepSeekHistory", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -115,6 +145,14 @@
                     "content": [
                       { "name": "label", "type": "string", "content": "Text Editor" },
                       { "name": "component", "type": "string", "content": "TextEditor" }
+                    ]
+                  },
+                  {
+                    "name": "PDFViewer",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "PDF Viewer" },
+                      { "name": "component", "type": "string", "content": "PDFViewer" }
                     ]
                   },
                   {
