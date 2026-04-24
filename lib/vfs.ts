@@ -47,12 +47,13 @@ class VFS {
   private initPromise: Promise<void> | null = null;
   private mountPoints: Set<string> = new Set();
 
-  async init() {
+  async init(yieldStatus?: (status: string) => void) {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
       try {
         // 1. Request persistence
+        yieldStatus?.("Requesting storage persistence...");
         if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
           try {
             await navigator.storage.persist();
@@ -62,6 +63,7 @@ class VFS {
         }
 
         // 2. Configure ZenFS
+        yieldStatus?.("Configuring virtual file system...");
         // We prioritize OPFS (WebAccess) but fallback to IndexedDB if unavailable
         try {
           let opfsHandle: any = null;
@@ -74,6 +76,7 @@ class VFS {
           }
 
           if (opfsHandle) {
+            yieldStatus?.("Using OPFS for root mount");
             await configure({
               mounts: {
                 "/": { backend: WebAccess, handle: opfsHandle },
@@ -86,6 +89,7 @@ class VFS {
           }
         } catch (err) {
           console.warn("VFS: OPFS (WebAccess) failed or not supported, falling back to IndexedDB for root", err);
+          yieldStatus?.("Falling back to IndexedDB for root mount");
           await configure({
             mounts: {
               "/": IndexedDB,
@@ -96,13 +100,16 @@ class VFS {
         }
 
         // 3. Seed Defaults
+        yieldStatus?.("Seeding default file system structure...");
         await this.seedDefaults();
 
         // 4. Data Migration (Optional)
+        yieldStatus?.("Migrating legacy data (if any)...");
         await this.migrateLegacyData();
 
         // 5. Load saved mounts (Background - Non-blocking)
-        this.restoreMounts().catch((err) => console.warn("VFS: Background mount restoration failed", err));
+        yieldStatus?.("Restoring saved mount points...");
+        await this.restoreMounts(yieldStatus);
 
         console.log("VFS: ZenFS initialized at root (/)");
       } catch (err) {
@@ -247,7 +254,7 @@ class VFS {
     });
   }
 
-  private async restoreMounts() {
+  private async restoreMounts(yieldStatus?: (status: string) => void) {
     try {
       if (!(await this.pathExists(SYSTEM_MOUNTS_DIR))) {
         await fs.promises.mkdir(SYSTEM_MOUNTS_DIR, { recursive: true });
@@ -269,6 +276,7 @@ class VFS {
 
       // 2. Mount each one
       for (const name of names) {
+        yieldStatus?.(`Restoring mount ${name}`);
         const handle = handles[names.indexOf(name)];
         const mountPath = `/${name}`;
 
@@ -476,15 +484,20 @@ class VFS {
 
   async writeFile(path: string, content: string | ArrayBuffer | Blob) {
     await this.init();
-    let data: Uint8Array | string;
+    let data: Uint8Array;
     if (content instanceof Blob) {
       data = new Uint8Array(await content.arrayBuffer());
     } else if (content instanceof ArrayBuffer) {
       data = new Uint8Array(content);
     } else {
-      data = content;
+      // string
+      const encoder = new TextEncoder();
+      data = encoder.encode(content);
     }
-    await fs.promises.writeFile(this.normalize(path), data);
+    const normalized = this.normalize(path);
+    await fs.promises.writeFile(normalized, data);
+    // Ensure the file is truncated to the correct length
+    await fs.promises.truncate(normalized, data.length);
     this.notifyChange(path);
   }
 

@@ -5,6 +5,9 @@ import { useWindowActions } from "@/hooks/useWindowActions";
 import { Button } from "@/components/ui/button";
 import { vfs } from "@/lib/vfs";
 import { toast } from "sonner";
+import { useSystemDialogs } from "@/hooks/useSystemDialogs";
+import { set } from "@zenfs/core/vfs/xattr.js";
+import { useGetWindowState } from "@/hooks/useGetWindowState";
 
 // In-app Search panel component (not in the application registry)
 function SearchPanel() {
@@ -36,11 +39,7 @@ function SearchPanel() {
           >
             Find Next
           </Button>
-          <Button
-            variant="ghost"
-            className="px-4 py-1 h-7 text-sm bg-gray-300 border border-gray-500 hover:bg-gray-400"
-            onClick={close}
-          >
+          <Button variant="ghost" className="px-4 py-1 h-7 text-sm bg-gray-300 border border-gray-500 hover:bg-gray-400" onClick={close}>
             Cancel
           </Button>
         </div>
@@ -54,8 +53,11 @@ interface TextEditorProps {
   initialContent?: string;
 }
 
-export default function TextEditor({ filePath, }: TextEditorProps) {
-  const { openChildWindow, setMenuBar } = useWindowActions();
+export default function TextEditor({ filePath: initialFilePath, initialContent }: TextEditorProps) {
+  const { openChildWindow, setMenuBar, close } = useWindowActions();
+  const { title } = useGetWindowState(["title"]);
+  const [filePath, setFilePath] = useState(initialFilePath);
+  const { showOpenFileDialog, showSaveFileDialog } = useSystemDialogs();
   const [content, setContent] = useState("");
 
   const handleOpenSearch = () => {
@@ -69,6 +71,32 @@ export default function TextEditor({ filePath, }: TextEditorProps) {
       maximizable: false,
       minimizable: false,
     });
+  };
+
+  const handleOpenFile = async () => {
+    try {
+      const selectedFile = await showOpenFileDialog();
+      if (selectedFile) {
+        setFilePath(selectedFile);
+      }
+    } catch (err) {
+      toast.error("Failed to open file.");
+      console.error(err);
+    }
+  };
+
+  const handleSaveAs = async () => {
+    try {
+      const selectedFile = await showSaveFileDialog();
+      if (selectedFile) {
+        await vfs.writeFile(selectedFile, content);
+        setFilePath(selectedFile);
+        toast.success(`File saved: ${selectedFile}`);
+      }
+    } catch (err) {
+      toast.error("Failed to save file.");
+      console.error(err);
+    }
   };
 
   const handleSave = async () => {
@@ -86,13 +114,40 @@ export default function TextEditor({ filePath, }: TextEditorProps) {
   };
 
   useEffect(() => {
+    const loadFile = async () => {
+      if (!filePath) {
+        setContent(initialContent ?? "");
+        return;
+      }
+
+      setContent("");
+      try {
+        const blob = await vfs.readFile(filePath);
+        const text = await blob.text();
+        setContent(text);
+      } catch (err) {
+        toast.error("Failed to load file.");
+        console.error(err);
+      }
+    };
+
+    loadFile();
+  }, [filePath, initialContent]);
+
+  useEffect(() => {
     setMenuBar([
       {
         type: "submenu",
         label: "File",
         items: [
           { type: "item", label: "New", action: () => setContent("") },
+          { type: "separator" },
+          { type: "item", label: "Open...", action: handleOpenFile },
+          { type: "separator" },
           { type: "item", label: "Save", action: handleSave },
+          { type: "item", label: "Save As...", action: handleSaveAs },
+          { type: "separator" },
+          { type: "item", label: "Exit", action: close },
         ],
       },
       {

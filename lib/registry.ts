@@ -493,7 +493,7 @@ class Registry {
 
   /** Groundwork for Setup/Recovery: Wipes the system hive */
   async factoryReset() {
-    await vfs.delete(this.SYSTEM_DIR);
+    await vfs.delete(this.HIVE_PATH);
     window.location.reload();
   }
 }
