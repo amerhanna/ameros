@@ -24,7 +24,7 @@ interface FolderTreeViewProps {
 // This gives them stable references, preventing the underlying TreeView
 // from unnecessarily remounting nodes and wiping out local expansion state.
 const getIcon = (item: FolderTreeNode): ReactNode => {
-  if (item.type === "dir" || item.type === "drive") {
+  if (item.type === "dir") {
     return item.isMountPoint ? (
       <HardDrive className="w-3.5 h-3.5 text-blue-600" />
     ) : (

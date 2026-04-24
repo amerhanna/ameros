@@ -113,21 +113,10 @@ export default function FileExplorer() {
       
       if (openCommand) {
         try {
-          const content = await vfs.readFile(node.path);
-          const textContent =
-            content instanceof Blob
-              ? await content.text()
-              : content instanceof ArrayBuffer
-              ? new TextDecoder().decode(content)
-              : typeof content === 'string'
-              ? content
-              : '';
-
           launchApp(openCommand, {
             title: `${node.name} - ${openCommand}`,
             launchArgs: {
               filePath: node.path,
-              initialContent: textContent,
             },
           });
         } catch (err) {

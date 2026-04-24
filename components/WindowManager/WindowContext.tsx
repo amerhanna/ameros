@@ -34,7 +34,6 @@ export interface WindowContextType {
   /** Live frame from the DOM (matches drag/resize; x/y may differ from props until React state catches up) */
   getBounds: () => { x: number; y: number; width: number; height: number };
   launchArgs?: Record<string, any>;
-  menuBar?: MenuItemType[];
   setMenuBar: (menu: MenuItemType[]) => void;
   /** Return false (or a Promise that resolves false) to cancel closing */
   setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => void;

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import type { Application } from "@/types/window";
+import type { Application, ApplicationRegistry } from "@/types/window";
 import DemoApp from '@/Applications/DemoApp/DemoApp';
 import TextEditor from '@/Applications/TextEditor/TextEditor';
 import Calculator from '@/Applications/Calculator/Calculator';
@@ -40,7 +40,4 @@ export const bundledComponents: Record<string, React.ComponentType<any>> = {
  * Special handlers for bundled applications that can't be stored in registry.
  */
 export const bundledHandlers: Record<string, Partial<Pick<Application, 'beforeClose'>>> = {
-  Calculator: {
-    beforeClose: () => confirm('Registry: Are you sure you want to close the Calculator?'),
-  },
 };

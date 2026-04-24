@@ -14,7 +14,8 @@ import { useStartMenu } from "@/hooks/useStartMenu";
 import { useDesktopContextMenu } from "@/hooks/useDesktopContextMenu";
 import { useMessageBox } from "@/hooks/useMessageBox";
 import { registry } from "@/lib/registry";
-import { bundledComponents, bundledHandlers } from "@/lib/bundled-apps";
+import type { StartupAppEntry } from '@/types/window';
+import { appService } from "@/lib/app-service";
 
 /** Core props configuring the base desktop shell environment. */
 interface WindowManagerProps {
@@ -168,48 +169,31 @@ function DesktopContent({
  * Handles the splash screen mounting logic sequence globally.
  */
 export default function WindowManager({ children, applicationRegistry = {}, additionalStartMenuItems = [] }: WindowManagerProps) {
-  const [loadedApplicationRegistry, setLoadedApplicationRegistry] = useState<ApplicationRegistry>({});
+  const [bundledApps, setBundledApps] = useState<ApplicationRegistry>(appService.getApplicationRegistry());
+  const [isServiceReady, setIsServiceReady] = useState(false);
 
-  // Load bundled applications from registry
   useEffect(() => {
-    async function loadBundledApps() {
-      try {
-        const appsPath = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
-        const appKeys = await registry.getKeys(appsPath);
-        const loaded: ApplicationRegistry = {};
+    let isMounted = true;
 
-        for (const appKey of appKeys) {
-          const appPath = `${appsPath}/${appKey}`;
-          const values = await registry.getValues(appPath);
-          
-          loaded[appKey] = {
-            component: bundledComponents[appKey],
-            icon: values.icon as string || '❓',
-            width: values.width as number || 400,
-            height: values.height as number || 300,
-            resizable: values.resizable as boolean ?? true,
-            maximizable: values.maximizable as boolean ?? true,
-            minimizable: values.minimizable as boolean ?? true,
-            minWidth: values.minWidth as number,
-            minHeight: values.minHeight as number,
-            ...bundledHandlers[appKey], // Merge special handlers
-          };
-        }
+    appService.waitUntilReady()
+      .then(() => {
+        if (!isMounted) return;
+        setBundledApps(appService.getApplicationRegistry());
+        setIsServiceReady(true);
+      })
+      .catch((error) => {
+        console.error('App service failed to initialize:', error);
+      });
 
-        setLoadedApplicationRegistry(loaded);
-      } catch (error) {
-        console.error('Failed to load bundled applications from registry:', error);
-      }
-    }
-
-    loadBundledApps();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Merge loaded registry apps with prop apps
   const mergedApplicationRegistry = useMemo(() => ({
-    ...loadedApplicationRegistry,
+    ...bundledApps,
     ...applicationRegistry,
-  }), [loadedApplicationRegistry, applicationRegistry]);
+  }), [bundledApps, applicationRegistry]);
 
   const engine = useWindowEngine(mergedApplicationRegistry);
   const [isSplashFinished, setIsSplashFinished] = useState(false);
@@ -234,10 +218,7 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
     const sameLaunchArgs = (a: any, b: any) =>
       JSON.stringify(normalizeLaunchArgs(a)) === JSON.stringify(normalizeLaunchArgs(b));
 
-    const handleStartupApps = (event: Event) => {
-      const startupApps = (event as CustomEvent<Record<string, any>[]>).detail;
-      if (!Array.isArray(startupApps)) return;
-
+    const handleStartupApps = (startupApps: any[]) => {
       startupApps.forEach((app) => {
         if (typeof app?.component !== 'string') return;
 
@@ -254,9 +235,31 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
       });
     };
 
-    window.addEventListener('ameros-startup-apps', handleStartupApps as EventListener);
-    return () => window.removeEventListener('ameros-startup-apps', handleStartupApps as EventListener);
-  }, [engine.launchApp, engine.windows]);
+    const dispatchStartupApps = async () => {
+      if (!isServiceReady) return;
+
+      const startupApps = await registry.get<StartupAppEntry[]>(
+        'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartupAppsToLaunch',
+        [],
+      );
+
+      if (!Array.isArray(startupApps) || startupApps.length === 0) return;
+
+      handleStartupApps(startupApps);
+      await registry.set('HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartupAppsToLaunch', []);
+    };
+
+    dispatchStartupApps();
+
+    const handleStartupAppsEvent = (event: Event) => {
+      const startupApps = (event as CustomEvent<Record<string, any>[]>).detail;
+      if (!Array.isArray(startupApps)) return;
+      handleStartupApps(startupApps);
+    };
+
+    window.addEventListener('ameros-startup-apps', handleStartupAppsEvent as EventListener);
+    return () => window.removeEventListener('ameros-startup-apps', handleStartupAppsEvent as EventListener);
+  }, [engine.launchApp, engine.windows, isServiceReady]);
 
   return (
     <SystemActionsContext.Provider value={{ launchApp: engine.launchApp }}>

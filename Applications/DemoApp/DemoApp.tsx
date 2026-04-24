@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button"
 import { useWindowActions } from '@/hooks/useWindowActions';
 import { useGetWindowState } from '@/hooks/useGetWindowState';
-import { useMenuBar } from '@/hooks/useMenuBar';
 import { useMessageBox } from '@/hooks/useMessageBox';
 import type { MenuItemType } from '@/components/WindowManager/Menu';
 
@@ -13,7 +12,7 @@ interface DemoAppProps {
 }
 
 export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
-  const { maximize, minimize, restore, move, resize, close, id } = useWindowActions();
+  const { maximize, minimize, restore, move, resize, close, id, setMenuBar } = useWindowActions();
   const { isMaximized, isMinimized, x, y, width, height } = useGetWindowState([
     'isMaximized',
     'isMinimized',
@@ -67,7 +66,9 @@ export default function DemoApp({ title = "Demo Application" }: DemoAppProps) {
     },
   ], [close, showMessageBox, showInputBox]);
 
-  useMenuBar(menu);
+  useEffect(() => {
+    setMenuBar(menu);
+  }, [menu, setMenuBar]);
 
   return (
     <div className="p-4">

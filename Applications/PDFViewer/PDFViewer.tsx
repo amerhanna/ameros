@@ -26,15 +26,7 @@ export default function PDFViewer({ filePath, url }: PDFViewerProps) {
         const content = await vfs.readFile(filePath);
         
         // Convert to Blob with proper PDF MIME type for the browser to handle it correctly
-        let blob: Blob;
-        if (content instanceof Blob) {
-          blob = new Blob([content], { type: "application/pdf" });
-        } else if (content instanceof ArrayBuffer) {
-          blob = new Blob([content], { type: "application/pdf" });
-        } else {
-          // If it's a string, it's likely not a PDF content but let's try
-          blob = new Blob([content], { type: "application/pdf" });
-        }
+        const blob = new Blob([content], { type: "application/pdf" });
 
         objectUrl = URL.createObjectURL(blob);
         setPdfUrl(objectUrl);

@@ -150,7 +150,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                  "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",

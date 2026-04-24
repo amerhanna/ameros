@@ -10,7 +10,7 @@ import { vfs } from "@/lib/vfs"
 import { toast } from "sonner"
 import { Download, Upload, RotateCcw, Trash2, AlertTriangle } from "lucide-react"
 
-const REGISTRY_PATH = "/System/config/SYSTEM.reg";
+const REGISTRY_DIR = "/System/config";
 
 /** Triggers a browser file download from a Blob. */
 function downloadBlob(blob: Blob, filename: string) {
@@ -144,7 +144,7 @@ export default function Settings() {
   // --- Storage actions ---
   const handleExportStorage = () =>
     withLoading("exportStorage", async () => {
-      const blob = await vfs.exportStorage([REGISTRY_PATH]);
+      const blob = await vfs.exportStorage([REGISTRY_DIR]);
       downloadBlob(blob, "ameros_storage.zip");
       toast.success("Internal storage exported successfully.");
     });
@@ -162,7 +162,7 @@ export default function Settings() {
     setConfirm({
       message: "This will delete all files on the internal storage (root filesystem), excluding the registry. The system will reload.",
       action: async () => {
-        await vfs.clearStorage([REGISTRY_PATH]);
+        await vfs.clearStorage([REGISTRY_DIR]);
         toast.success("Internal storage cleared. Reloading...");
         setTimeout(() => window.location.reload(), 1000);
       },
