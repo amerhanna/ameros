@@ -211,8 +211,10 @@ export default function Regedit() {
         launchArgs: {
           mode: "editValue",
           selectedKey: item.parentPath,
+          fullPath: item.fullPath,
           valueName: item.valueName,
-          value: item.value,
+          currentValue: item.value,
+          currentType: getRegistryValueType(item.value),
         },
         width: 440,
         height: 335,
