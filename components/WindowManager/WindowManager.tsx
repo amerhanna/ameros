@@ -175,6 +175,11 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
   useEffect(() => {
     let isMounted = true;
 
+    const refreshApplications = () => {
+      if (!isMounted) return;
+      setBundledApps(appService.getApplicationRegistry());
+    };
+
     appService.waitUntilReady()
       .then(() => {
         if (!isMounted) return;
@@ -185,8 +190,11 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
         console.error('App service failed to initialize:', error);
       });
 
+    window.addEventListener('ameros-app-registry-update', refreshApplications);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('ameros-app-registry-update', refreshApplications);
     };
   }, []);
 

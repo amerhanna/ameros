@@ -241,7 +241,7 @@
                       { "name": "label", "type": "string", "content": "Utilities" },
                       { "name": "type", "type": "string", "content": "submenu" },
                       { "name": "icon", "type": "string", "content": "🧰" },
-                      { "name": "default", "type": "object", "content": ["Regedit", "DBExplorer", "Installer"] },
+                      { "name": "default", "type": "object", "content": ["Regedit", "DBExplorer", "Installer", "AXPInstaller"] },
                       {
                         "name": "Regedit",
                         "type": "key",
@@ -264,6 +264,14 @@
                         "content": [
                           { "name": "label", "type": "string", "content": "App Installer" },
                           { "name": "component", "type": "string", "content": "Installer" }
+                        ]
+                      },
+                      {
+                        "name": "AXPInstaller",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "AXP Installer" },
+                          { "name": "component", "type": "string", "content": "AXPInstaller" }
                         ]
                       }
                     ]
@@ -377,6 +385,17 @@
                     "type": "key",
                     "content": [
                       { "name": "icon", "type": "string", "content": "🛠️" },
+                      { "name": "width", "type": "number", "content": 900 },
+                      { "name": "height", "type": "number", "content": 700 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "AXPInstaller",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📦" },
                       { "name": "width", "type": "number", "content": 900 },
                       { "name": "height", "type": "number", "content": 700 },
                       { "name": "resizable", "type": "boolean", "content": true },

@@ -741,7 +741,7 @@ class VFS {
       if (entry.directory) {
         if (!fs.existsSync(path)) fs.mkdirSync(path, { recursive: true });
       } else {
-        const data = await entry.getData!(new Uint8ArrayWriter());
+        const data = await (entry as any).getData!(new Uint8ArrayWriter());
         const parent = path.substring(0, path.lastIndexOf("/"));
         if (parent && !fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
         fs.writeFileSync(path, data);

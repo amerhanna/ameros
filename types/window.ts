@@ -27,6 +27,7 @@ export type StartMenuItem = {
   label: string
   component: string
   launchArgs?: Record<string, any>
+  category?: string
   type?: "item"
 } | {
   type: "separator"
@@ -41,6 +42,15 @@ export type StartMenuItem = {
   items: StartMenuItem[]
   icon?: string
   disabled?: boolean
+}
+
+export interface AxpManifest {
+  id: string
+  name: string
+  version: string
+  entryPoint: string
+  icon?: string
+  category?: string
 }
 
 export interface PersistentWindowState extends WindowConfig {

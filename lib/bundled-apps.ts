@@ -10,6 +10,7 @@ import Settings from '@/components/WindowManager/Settings';
 import TestCloseApp from '@/Applications/TestCloseApp/TestCloseApp';
 import CommonDialogDemo from '@/Applications/DemoApp/CommonDialogDemo';
 import InstallerApp from '@/Applications/Installer/InstallerApp';
+import AXPInstaller from '@/Applications/Installer/AXPInstaller';
 import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
 import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
@@ -30,6 +31,7 @@ export const bundledComponents: Record<string, React.ComponentType<any>> = {
   CommonDialogDemo,
   WebApp,
   Installer: InstallerApp,
+  AXPInstaller,
   Regedit,
   Notes,
   DBExplorer,
