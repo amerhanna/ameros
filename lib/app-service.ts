@@ -6,6 +6,11 @@ import { registry } from './registry';
 import { vfs } from './vfs';
 import type { StartMenuItem, InstalledApp, StartupAppEntry, ApplicationRegistry, Application, AxpManifest } from '@/types/window';
 
+// Make React available globally for AXP modules
+if (typeof window !== 'undefined') {
+  (window as any).React = React;
+}
+
 /**
  * Global registry for bundled applications, populated during boot.
  */
@@ -61,7 +66,7 @@ export function getBundledApps(): ApplicationRegistry {
 class AppService {
   private readonly BUNDLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
   private readonly INSTALLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps';
-  private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
+  private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu';
   private readonly STARTUP_KEY = 'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup';
 
   private initialized = false;
@@ -102,44 +107,33 @@ class AppService {
   }
 
   /**
-   * Links an installed application into the "Programs" folder of the Start Menu.
+   * Links an installed application directly into the Start Menu root for debugging.
    */
   async addToStartMenu(appId: string, item: StartMenuItem, category?: string) {
-    const parentKey = `${this.START_MENU_KEY}/Programs`;
-    const categoryKey = category ? await this.ensureStartMenuCategory(parentKey, category) : parentKey;
-    const appKey = `${categoryKey}/${appId}`;
+    const parentKey = this.START_MENU_KEY;
+    const appKey = `${parentKey}/${appId}`;
 
     await registry.createKey(appKey);
     if ('label' in item) await registry.set(`${appKey}/label`, item.label);
     if ('component' in item) await registry.set(`${appKey}/component`, (item as any).component);
     if ('launchArgs' in item) await registry.set(`${appKey}/launchArgs`, item.launchArgs || {});
 
-    const order = await registry.get<string[]>(categoryKey, []);
+    const order = await registry.get<string[]>(parentKey, []);
     if (!order.includes(appId)) {
-      await registry.set(categoryKey, [...order, appId]);
+      await registry.set(parentKey, [...order, appId]);
     }
   }
 
   /**
-   * Removes all shortcuts for the specified application from the "Programs" folder.
+   * Removes all shortcuts for the specified application from the Start Menu root.
    */
   async removeFromStartMenu(appId: string) {
-    const parentKey = `${this.START_MENU_KEY}/Programs`;
+    const parentKey = this.START_MENU_KEY;
     await registry.deleteKey(`${parentKey}/${appId}`);
 
     const order = await registry.get<string[]>(parentKey, []);
     if (order.includes(appId)) {
       await registry.set(parentKey, order.filter(id => id !== appId));
-    }
-
-    const appCategories = await registry.getKeys(parentKey);
-    for (const category of appCategories) {
-      const categoryPath = `${parentKey}/${category}`;
-      const categoryOrder = await registry.get<string[]>(categoryPath, []);
-      if (categoryOrder.includes(appId)) {
-        await registry.deleteKey(`${categoryPath}/${appId}`);
-        await registry.set(categoryPath, categoryOrder.filter(id => id !== appId));
-      }
     }
   }
 
@@ -281,14 +275,36 @@ class AppService {
 
     const entryPoint = `${appRoot}/${this.normalizeZipPath(manifest.entryPoint)}`;
     const moduleBlob = await vfs.readFile(entryPoint);
-    const sourceBlob = new Blob([await moduleBlob.arrayBuffer()], { type: 'application/javascript' });
-    const objectUrl = URL.createObjectURL(sourceBlob);
+    const sourceText = await moduleBlob.text();
 
-    try {
-      const loadedModule = await import(/* @vite-ignore */ objectUrl);
-      return loadedModule;
-    } finally {
-      URL.revokeObjectURL(objectUrl);
+    // Create a module wrapper that provides React and captures exports
+    const moduleCode = `
+      const exports = {};
+      const module = { exports };
+      const React = window.React;
+      const ReactDOM = window.ReactDOM;
+
+      // Simple require function
+      function require(id) {
+        if (id === 'react') return React;
+        if (id === 'react-dom') return ReactDOM;
+        throw new Error('Module ' + id + ' not found');
+      }
+
+      // Execute the module code
+      ${sourceText}
+
+      return module.exports.default || module.exports || exports.default || exports;
+    `;
+
+    // Execute in global scope
+    const result = new Function(moduleCode)();
+    return result;
+  }
+
+  private dispatchAppRegistryUpdate() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ameros-app-registry-update', { detail: { timestamp: Date.now() } }));
     }
   }
 
@@ -297,6 +313,7 @@ class AppService {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
+      await this.migrateStartMenuEntries();
       const bundledApps = await loadBundledApps();
       const nativeApps = await this.loadInstalledNativeApps();
       this.applicationRegistry = {
@@ -390,7 +407,7 @@ class AppService {
 
   private createAxpApplication(appId: string, manifest: AxpManifest, icon: string, appName: string): Application {
     const LazyComponent = React.lazy(async () => {
-      const module = await this.loadAxpModule(appId);
+      const module = await this.loadAxpModule(appId) as any;
       const exported = module?.default || module;
       return { default: exported };
     });
@@ -471,9 +488,42 @@ class AppService {
     return categoryKey;
   }
 
-  private dispatchAppRegistryUpdate() {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ameros-app-registry-update', { detail: { timestamp: Date.now() } }));
+  private async migrateStartMenuEntries() {
+    const oldItemsKey = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
+    const newKey = this.START_MENU_KEY;
+
+    try {
+      const oldKeys = await registry.getKeys(oldItemsKey);
+      if (oldKeys.length === 0) return; // No old entries
+
+      for (const key of oldKeys) {
+        const oldPath = `${oldItemsKey}/${key}`;
+        const newPath = `${newKey}/${key}`;
+        const values = await registry.getValues(oldPath);
+
+        // Copy to new location
+        await registry.createKey(newPath);
+        for (const [prop, value] of Object.entries(values)) {
+          await registry.set(`${newPath}/${prop}`, value);
+        }
+
+        // Add to root order if not already
+        const rootOrder = await registry.get<string[]>(newKey, []);
+        if (!rootOrder.includes(key)) {
+          await registry.set(newKey, [...rootOrder, key]);
+        }
+
+        // Remove old entry
+        await registry.deleteKey(oldPath);
+      }
+
+      // Clean up old Items key if empty
+      const remaining = await registry.getKeys(oldItemsKey);
+      if (remaining.length === 0) {
+        await registry.deleteKey(oldItemsKey);
+      }
+    } catch (error) {
+      console.warn('Failed to migrate start menu entries:', error);
     }
   }
 }
