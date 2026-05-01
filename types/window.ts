@@ -27,6 +27,7 @@ export type StartMenuItem = {
   label: string
   component: string
   launchArgs?: Record<string, any>
+  icon?: string
   type?: "item"
 } | {
   type: "separator"

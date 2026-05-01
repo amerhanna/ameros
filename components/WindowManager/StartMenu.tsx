@@ -45,7 +45,7 @@ function mapStartMenuItems(items: StartMenuItem[], onOpenWindow: StartMenuProps[
     return {
       type: "item",
       label: item.label,
-      icon: applicationRegistry?.[item.component]?.icon,
+      icon: item.icon || applicationRegistry?.[item.component]?.icon,
       action: () => onOpenWindow({ component: item.component, launchArgs: item.launchArgs }),
     }
   })

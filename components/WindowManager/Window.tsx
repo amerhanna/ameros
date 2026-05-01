@@ -34,6 +34,7 @@ interface WindowProps {
   onContextMenu?: (id: string, x: number, y: number) => void;
   setBeforeClose?: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
   openChildWindow?: (config: ChildWindowConfig) => string | null;
+  onSetTitle?: (id: string, title: string) => void;
 }
 
 export default function Window({
@@ -60,6 +61,7 @@ export default function Window({
   onContextMenu,
   setBeforeClose,
   openChildWindow,
+  onSetTitle,
 }: WindowProps) {
   const { x, y, width, height, isMinimized, isMaximized, zIndex } = useWindowStateById(
     id,
@@ -196,8 +198,11 @@ export default function Window({
       openChildWindow: (config: ChildWindowConfig) => {
         return openChildWindow?.(config) ?? null;
       },
+      setTitle: (newTitle: string) => {
+        onSetTitle?.(id, newTitle);
+      },
     }),
-    [id, appId, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow],
+    [id, appId, getBounds, maximizeWindow, minimizeWindow, restoreWindow, moveWindow, resizeWindow, closeWindow, launchArgs, setBeforeClose, openChildWindow, onSetTitle],
   );
 
   useEffect(() => {

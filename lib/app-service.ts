@@ -102,6 +102,7 @@ class AppService {
     if ('label' in item) await registry.set(`${appKey}/label`, item.label);
     if ('component' in item) await registry.set(`${appKey}/component`, (item as any).component);
     if ('launchArgs' in item) await registry.set(`${appKey}/launchArgs`, item.launchArgs || {});
+    if ('icon' in item) await registry.set(`${appKey}/icon`, (item as any).icon);
     
     // 2. Update the hierarchy map (Default value of the Programs key)
     const order = await registry.get<string[]>(parentKey, []);

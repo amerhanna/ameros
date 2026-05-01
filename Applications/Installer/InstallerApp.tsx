@@ -189,13 +189,39 @@ export default function InstallerApp() {
     await appService.addToStartMenu(appId, {
       label: externalLabel,
       component: 'WebApp',
-      launchArgs: appData.launchArgs
+      launchArgs: appData.launchArgs,
+      icon: iconUrl
     });
 
     setUrl("");
     setTitle("");
     setIconUrl("");
     setError("");
+  }
+
+  async function renameApp(appId: string, newLabel: string) {
+    const appPath = `HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps/${appId}`;
+    await registry.set(`${appPath}/label`, newLabel);
+    
+    // Update launch args title too
+    const launchArgs = await registry.get<any>(`${appPath}/launchArgs`);
+    if (launchArgs) {
+      launchArgs.title = newLabel;
+      await registry.set(`${appPath}/launchArgs`, launchArgs);
+    }
+
+    // Update start menu label
+    const startMenuPath = `HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Programs/${appId}`;
+    if (await registry.hasKey(startMenuPath)) {
+      await registry.set(`${startMenuPath}/label`, newLabel);
+      if (launchArgs) {
+        await registry.set(`${startMenuPath}/launchArgs`, launchArgs);
+      }
+    }
+    
+    // Refresh list
+    const apps = await appService.listInstalledApps();
+    setInstalledApps(apps);
   }
 
   async function uninstallApp(appId: string, itemUrl: string) {
@@ -220,7 +246,8 @@ export default function InstallerApp() {
     await appService.addToStartMenu(app.id, {
       label: app.label,
       component: 'WebApp',
-      launchArgs: appData.launchArgs
+      launchArgs: appData.launchArgs,
+      icon: app.iconUrl
     });
   }
 
@@ -244,6 +271,16 @@ export default function InstallerApp() {
           {!validUrl && url && (
             <p className="text-sm text-red-500">URL must start with http:// or https://</p>
           )}
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-muted-foreground">App Name</label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Application Name"
+              aria-label="Application name"
+            />
+          </div>
 
           <div className="p-3 border rounded-md bg-muted">
             <p className="text-sm font-medium">Discovery Preview</p>
@@ -342,7 +379,16 @@ export default function InstallerApp() {
                       alt="icon"
                       className="rounded"
                     />
-                    <span>{item.label}</span>
+                    <div className="flex flex-col">
+                      <Input
+                        value={item.label}
+                        className="h-7 py-0 px-2 text-sm w-32 sm:w-48"
+                        onChange={(e) => renameApp(item.id, e.target.value)}
+                      />
+                      <span className="text-[10px] text-muted-foreground px-2 truncate max-w-[150px]">
+                        {item.launchArgs.url}
+                      </span>
+                    </div>
                   </div>
                   <Button variant="destructive" size="sm" onClick={() => uninstallApp(item.id, item.launchArgs.url)}>
                     Uninstall
