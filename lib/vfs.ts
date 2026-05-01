@@ -518,6 +518,13 @@ class VFS {
     }
   }
 
+  async readDir(path: string): Promise<VFSNode[]> {
+    await this.init();
+    const normalized = this.normalize(path);
+    const entries = await fs.promises.readdir(normalized, { withFileTypes: true });
+    return entries.map((entry) => this.formatDirent(normalized, entry));
+  }
+
   async delete(path: string) {
     await this.init();
     await fs.promises.rm(this.normalize(path), { recursive: true, force: true });

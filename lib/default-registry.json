@@ -150,7 +150,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "NodeAppInstaller", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -184,6 +184,14 @@
                     "content": [
                       { "name": "label", "type": "string", "content": "PDF Viewer" },
                       { "name": "component", "type": "string", "content": "PDFViewer" }
+                    ]
+                  },
+                  {
+                    "name": "NodeAppInstaller",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Node.js App Installer" },
+                      { "name": "component", "type": "string", "content": "NodeAppInstaller" }
                     ]
                   },
                   {
@@ -420,6 +428,17 @@
                     "type": "key",
                     "content": [
                       { "name": "icon", "type": "string", "content": "📕" },
+                      { "name": "width", "type": "number", "content": 800 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "NodeAppInstaller",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📦" },
                       { "name": "width", "type": "number", "content": 800 },
                       { "name": "height", "type": "number", "content": 600 },
                       { "name": "resizable", "type": "boolean", "content": true },

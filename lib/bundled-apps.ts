@@ -15,6 +15,7 @@ import Regedit from '@/Applications/Regedit/Regedit';
 import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
 import Notes from '@/Applications/Notes/Notes';
 import PDFViewer from '@/Applications/PDFViewer/PDFViewer';
+import NodeAppInstaller from '@/Applications/NodeAppInstaller/NodeAppInstaller';
 
 /**
  * Map of bundled application component names to their React components.
@@ -34,6 +35,7 @@ export const bundledComponents: Record<string, React.ComponentType<any>> = {
   Notes,
   DBExplorer,
   PDFViewer,
+  NodeAppInstaller,
 };
 
 /**
