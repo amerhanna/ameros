@@ -9,6 +9,7 @@ import { appService } from "@/lib/app-service";
 import { setWindowsState } from "@/lib/window-store";
 import type { StartMenuItem, InstalledApp } from "@/types/window";
 import Image from "next/image";
+import { DebouncedInput } from "@/components/ui/debounced-input";
 
 function isValidHttpUrl(value: string): boolean {
   try {
@@ -204,7 +205,7 @@ export default function InstallerApp() {
     await registry.set(`${appPath}/label`, newLabel);
     
     // Update launch args title too
-    const launchArgs = await registry.get<any>(`${appPath}/launchArgs`);
+    const launchArgs = await registry.get<any>(`${appPath}/launchArgs`, null);
     if (launchArgs) {
       launchArgs.title = newLabel;
       await registry.set(`${appPath}/launchArgs`, launchArgs);
@@ -380,7 +381,7 @@ export default function InstallerApp() {
                       className="rounded"
                     />
                     <div className="flex flex-col">
-                      <Input
+                      <DebouncedInput
                         value={item.label}
                         className="h-7 py-0 px-2 text-sm w-32 sm:w-48"
                         onChange={(e) => renameApp(item.id, e.target.value)}
