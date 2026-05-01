@@ -49,6 +49,33 @@ function getFaviconUrl(urlString: string): string {
   }
 }
 
+const FEATURED_APPS = [
+  {
+    id: "wikipedia",
+    label: "Wikipedia",
+    url: "https://www.wikipedia.org",
+    iconUrl: "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=128",
+  },
+  {
+    id: "photopea",
+    label: "Photopea",
+    url: "https://www.photopea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=photopea.com&sz=128",
+  },
+  {
+    id: "vectorpea",
+    label: "Vectorpea",
+    url: "https://www.vectorpea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128",
+  },
+  {
+    id: "jampea",
+    label: "Jampea",
+    url: "https://jampea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=jampea.com&sz=128",
+  },
+];
+
 export default function InstallerApp() {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -176,6 +203,27 @@ export default function InstallerApp() {
     setWindowsState((prev) => prev.filter((w) => !(w.component === 'WebApp' && w.launchArgs?.url === itemUrl)));
   }
 
+  async function installFeaturedApp(app: typeof FEATURED_APPS[0]) {
+    const appData: Omit<InstalledApp, 'installDate'> = {
+      id: app.id,
+      label: app.label,
+      type: 'website',
+      iconUrl: app.iconUrl,
+      launchArgs: {
+        url: app.url,
+        title: app.label,
+        iconUrl: app.iconUrl,
+      },
+    };
+
+    await appService.installApp(appData);
+    await appService.addToStartMenu(app.id, {
+      label: app.label,
+      component: 'WebApp',
+      launchArgs: appData.launchArgs
+    });
+  }
+
   return (
     <div className="p-4 space-y-4">
       <Card>
@@ -232,6 +280,49 @@ export default function InstallerApp() {
             Install to Start Menu
           </Button>
         </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recommended Web Apps</CardTitle>
+          <CardDescription>
+            Quickly install popular web applications to your AmerOS desktop.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {FEATURED_APPS.map((app) => {
+              const isInstalled = installedApps.some(a => a.id === app.id);
+              return (
+                <div key={app.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 relative flex-shrink-0">
+                      <Image
+                        src={app.iconUrl}
+                        fill
+                        alt={app.label}
+                        className="rounded object-contain"
+                        unoptimized
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{app.label}</span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">{app.url}</span>
+                    </div>
+                  </div>
+                  <Button 
+                    variant={isInstalled ? "secondary" : "outline"} 
+                    size="sm"
+                    disabled={isInstalled}
+                    onClick={() => installFeaturedApp(app)}
+                  >
+                    {isInstalled ? "Installed" : "Install"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
       </Card>
 
       {installedApps.length > 0 && (
