@@ -21,7 +21,7 @@ const additionalApplicationRegistry: ApplicationRegistry = {
 // Additional start menu items to be placed in Programs submenu
 const additionalStartMenuItems: StartMenuItem[] = [
   {
-    label: 'History Explorer',
+    label: 'DeepSeek History Explorer',
     component: 'DeepSeekHistory',
   },
 ];

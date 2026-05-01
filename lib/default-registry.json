@@ -183,6 +183,7 @@
                         "content": [
                           { "name": "label", "type": "string", "content": "Wikipedia" },
                           { "name": "component", "type": "string", "content": "WebApp" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=128" },
                           { "name": "launchArgs", "type": "object", "content": { "url": "https://www.wikipedia.org", "title": "Wikipedia", "iconUrl": "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=128" } }
                         ]
                       },
@@ -192,6 +193,7 @@
                         "content": [
                           { "name": "label", "type": "string", "content": "Photopea" },
                           { "name": "component", "type": "string", "content": "WebApp" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=photopea.com&sz=128" },
                           { "name": "launchArgs", "type": "object", "content": { "url": "https://www.photopea.com/", "title": "Photopea", "iconUrl": "https://www.google.com/s2/favicons?domain=photopea.com&sz=128" } }
                         ]
                       },
@@ -201,6 +203,7 @@
                         "content": [
                           { "name": "label", "type": "string", "content": "Vectorpea" },
                           { "name": "component", "type": "string", "content": "WebApp" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128" },
                           { "name": "launchArgs", "type": "object", "content": { "url": "https://www.vectorpea.com/", "title": "Vectorpea", "iconUrl": "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128" } }
                         ]
                       },
@@ -210,6 +213,7 @@
                         "content": [
                           { "name": "label", "type": "string", "content": "Jampea" },
                           { "name": "component", "type": "string", "content": "WebApp" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=jampea.com&sz=128" },
                           { "name": "launchArgs", "type": "object", "content": { "url": "https://jampea.com/", "title": "Jampea", "iconUrl": "https://www.google.com/s2/favicons?domain=jampea.com&sz=128" } }
                         ]
                       }
