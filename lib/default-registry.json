@@ -100,6 +100,23 @@
     "type": "key",
     "content": [
       {
+        "name": "Control Panel",
+        "type": "key",
+        "content": [
+          {
+            "name": "Desktop",
+            "type": "key",
+            "content": [
+              {
+                "name": "Wallpaper",
+                "type": "string",
+                "content": "/System/Wallpaper/ameros-bg.png"
+              }
+            ]
+          }
+        ]
+      },
+      {
         "name": "SOFTWARE",
         "type": "key",
         "content": [

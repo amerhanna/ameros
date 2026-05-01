@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, CornerLeftUp, FolderPlus, FolderMinus, Search, SearchSlash } from "lucide-react"
+import { ChevronLeft, ChevronRight, CornerLeftUp, FolderPlus, FolderMinus, Search, SearchSlash, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 
@@ -16,6 +16,8 @@ interface ToolbarProps {
   onMount: () => void
   onUnmount: () => void
   canUnmount: boolean
+  canUpload: boolean
+  onUpload: () => void
   onPathChange: (path: string) => void
 }
 
@@ -31,6 +33,8 @@ export function Toolbar({
   onMount,
   onUnmount,
   canUnmount,
+  canUpload,
+  onUpload,
   onPathChange,
 }: ToolbarProps) {
   const [inputValue, setInputValue] = useState(currentPath);
@@ -118,6 +122,16 @@ export function Toolbar({
             className="h-8 w-8 rounded-none hover:bg-[#c1c1c1] border border-transparent hover:border-b-white hover:border-r-white hover:border-t-[#808080] hover:border-l-[#808080]"
           >
             <FolderMinus className="w-4 h-4 text-slate-800" />
+          </Button>
+          <Button
+            title="Upload File"
+            variant="ghost"
+            size="icon"
+            onClick={onUpload}
+            disabled={!canUpload}
+            className="h-8 w-8 rounded-none hover:bg-[#c1c1c1] border border-transparent hover:border-b-white hover:border-r-white hover:border-t-[#808080] hover:border-l-[#808080]"
+          >
+            <Upload className="w-4 h-4 text-slate-800" />
           </Button>
         </div>
       </div>

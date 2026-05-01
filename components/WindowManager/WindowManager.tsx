@@ -16,6 +16,7 @@ import { useMessageBox } from "@/hooks/useMessageBox";
 import { registry } from "@/lib/registry";
 import type { StartupAppEntry } from '@/types/window';
 import { appService } from "@/lib/app-service";
+import { vfs } from "@/lib/vfs";
 
 /** Core props configuring the base desktop shell environment. */
 interface WindowManagerProps {
@@ -81,8 +82,42 @@ function DesktopContent({
 
   const selectedWindow = useMemo(() => windows.find((w) => w.id === contextMenu.windowId), [windows, contextMenu.windowId]);
 
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadWallpaper = async () => {
+      try {
+        const wallpaperPath = await registry.get<string>("HKEY_CURRENT_USER/Control Panel/Desktop/Wallpaper", "/System/Wallpaper/ameros-bg.png");
+        if (wallpaperPath) {
+          const file = await vfs.readFile(wallpaperPath);
+          const url = URL.createObjectURL(file);
+          setBgUrl(url);
+        } else {
+          setBgUrl(null);
+        }
+      } catch (err) {
+        console.warn("Failed to load wallpaper", err);
+        setBgUrl(null);
+      }
+    };
+
+    loadWallpaper();
+
+    const handleRegUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || !detail.path || detail.path.startsWith("HKEY_CURRENT_USER/Control Panel/Desktop")) {
+        loadWallpaper();
+      }
+    };
+
+    window.addEventListener('reg-update', handleRegUpdate);
+    return () => {
+      window.removeEventListener('reg-update', handleRegUpdate);
+    };
+  }, []);
+
   return (
-    <div className="h-screen bg-teal-600 bg-[url('/ameros-bg.png')] bg-cover bg-center bg-no-repeat overflow-hidden relative">
+    <div className="h-screen bg-teal-600 bg-cover bg-center bg-no-repeat overflow-hidden relative" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : {}}>
       {/* Render Windows */}
       {windows.map((window) => {
         const WindowComponent = window.component;

@@ -215,6 +215,50 @@ export default function FileExplorer() {
     }
   }, []);
 
+  const handleUpload = () => {
+    if (currentPath === '/') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (!files || files.length === 0) return;
+      
+      let successCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          await vfs.writeFile(`${currentPath}/${file.name}`, file);
+          successCount++;
+        } catch (err) {
+          toast.error(`Failed to upload ${file.name}`);
+        }
+      }
+      
+      if (successCount > 0) {
+        loadFolderItems();
+        toast.success(`Uploaded ${successCount} file(s)`);
+      }
+    };
+    input.click();
+  };
+
+  const handleDownload = async (path: string) => {
+    try {
+      const blob = await vfs.readFile(path);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = path.split('/').pop() || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Failed to download file');
+    }
+  };
+
   // --- Context Menu Actions ---
 
   const handleDelete = async (path: string) => {
@@ -375,6 +419,8 @@ export default function FileExplorer() {
   const fileMenuItems: MenuItemType[] = [
     { type: 'item', label: 'Open', action: () => handleOpen(contextMenu!.item!), bold: true },
     { type: 'separator' },
+    { type: 'item', label: 'Download', action: () => handleDownload(contextMenu!.item!.path), icon: '⬇️' },
+    { type: 'separator' },
     { type: 'item', label: 'Cut', action: () => handleCut(contextMenu!.item!.path), icon: '✂️' },
     { type: 'item', label: 'Copy', action: () => handleCopy(contextMenu!.item!.path), icon: '📋' },
     { type: 'separator' },
@@ -419,6 +465,8 @@ export default function FileExplorer() {
         onMount={handleMount} 
         canUnmount={selectedPath !== null && vfs.isMountPoint(selectedPath)}
         onUnmount={handleUnmount}
+        canUpload={currentPath !== '/'}
+        onUpload={handleUpload}
         onPathChange={handlePathChange}
       />
 

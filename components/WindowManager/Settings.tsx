@@ -9,6 +9,7 @@ import { registry } from "@/lib/registry"
 import { vfs } from "@/lib/vfs"
 import { toast } from "sonner"
 import { Download, Upload, RotateCcw, Trash2, AlertTriangle } from "lucide-react"
+import { useSystemDialogs } from "@/hooks/useSystemDialogs"
 
 const REGISTRY_DIR = "/System/config";
 
@@ -103,6 +104,7 @@ function ActionButton({
 export default function Settings() {
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const { showOpenFileDialog } = useSystemDialogs();
 
   const withLoading = useCallback(async (key: string, fn: () => Promise<void>) => {
     setLoading(key);
@@ -115,6 +117,18 @@ export default function Settings() {
       setLoading(null);
     }
   }, []);
+
+  // --- Appearance actions ---
+  const handleSelectWallpaper = async () => {
+    const path = await showOpenFileDialog({
+      initialPath: "/System/Wallpaper",
+      fileFilter: (node) => node.type === "file" && /\.(png|jpe?g|gif|svg|webp)$/i.test(node.name)
+    });
+    if (path) {
+      await registry.set("HKEY_CURRENT_USER/Control Panel/Desktop/Wallpaper", path);
+      toast.success("Wallpaper updated");
+    }
+  };
 
   // --- Registry actions ---
   const handleExportRegistry = () =>
@@ -189,6 +203,16 @@ export default function Settings() {
         </TabsList>
         
         <TabsContent value="appearance" className="space-y-6">
+          <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="space-y-0.5">
+              <Label className="text-base font-semibold">Wallpaper</Label>
+              <p className="text-sm text-gray-500">Choose a background image from the VFS.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleSelectWallpaper}>
+              Browse...
+            </Button>
+          </div>
+
           <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="space-y-0.5">
               <Label className="text-base font-semibold">Dark Mode</Label>
