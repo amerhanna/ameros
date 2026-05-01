@@ -496,8 +496,6 @@ class VFS {
     }
     const normalized = this.normalize(path);
     await fs.promises.writeFile(normalized, data);
-    // Ensure the file is truncated to the correct length
-    await fs.promises.truncate(normalized, data.length);
     this.notifyChange(path);
   }
 

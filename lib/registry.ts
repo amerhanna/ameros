@@ -43,6 +43,19 @@ class Registry {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
   private readonly SYSTEM_DIR = "/System/config";
+  private rwLock = Promise.resolve();
+
+  private async executeLocked<T>(task: () => Promise<T>): Promise<T> {
+    const previous = this.rwLock;
+    let release!: () => void;
+    this.rwLock = new Promise<void>(resolve => { release = resolve; });
+    try {
+      await previous;
+      return await task();
+    } finally {
+      release();
+    }
+  }
 
   async init() {
     if (this.isInitialized) return;
@@ -89,12 +102,14 @@ class Registry {
    */
   async get<T>(path: string, defaultValue: T): Promise<T> {
     await this.ensureInitialized();
-    try {
-      const hive = await this.loadHiveFlat();
-      return hive[path] !== undefined ? (hive[path] as T) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
+    return this.executeLocked(async () => {
+      try {
+        const hive = await this.loadHiveFlat();
+        return hive[path] !== undefined ? (hive[path] as T) : defaultValue;
+      } catch {
+        return defaultValue;
+      }
+    });
   }
 
   /**
@@ -106,47 +121,55 @@ class Registry {
    */
   async set(path: string, value: RegistryValue): Promise<void> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    this.setValueNode(rawHive, path, value);
-    await this.saveHiveRaw(rawHive);
+    await this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      this.setValueNode(rawHive, path, value);
+      await this.saveHiveRaw(rawHive);
+    });
     window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value } }));
   }
 
   async createKey(path: string, defaultValue?: RegistryValue): Promise<void> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    const keyNode = this.ensureKeyNode(rawHive, path);
+    await this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      const keyNode = this.ensureKeyNode(rawHive, path);
 
-    if (defaultValue !== undefined) {
-      const valueNode: RegistryValueNode = {
-        name: 'default',
-        type: this.getValueType(defaultValue),
-        content: defaultValue,
-      };
+      if (defaultValue !== undefined) {
+        const valueNode: RegistryValueNode = {
+          name: 'default',
+          type: this.getValueType(defaultValue),
+          content: defaultValue,
+        };
 
-      const existingIndex = keyNode.content.findIndex(
-        (child): child is RegistryValueNode => child.type !== 'key' && child.name === 'default'
-      );
+        const existingIndex = keyNode.content.findIndex(
+          (child): child is RegistryValueNode => child.type !== 'key' && child.name === 'default'
+        );
 
-      if (existingIndex >= 0) {
-        keyNode.content[existingIndex] = valueNode;
-      } else {
-        keyNode.content.push(valueNode);
+        if (existingIndex >= 0) {
+          keyNode.content[existingIndex] = valueNode;
+        } else {
+          keyNode.content.push(valueNode);
+        }
       }
-    }
 
-    await this.saveHiveRaw(rawHive);
+      await this.saveHiveRaw(rawHive);
+    });
     window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: defaultValue } }));
   }
 
   async getAllRaw(): Promise<RegistryNode[]> {
     await this.ensureInitialized();
-    return this.loadHiveRaw();
+    return this.executeLocked(async () => {
+      return this.loadHiveRaw();
+    });
   }
 
   async getAll(): Promise<Record<string, RegistryValue>> {
     await this.ensureInitialized();
-    return await this.loadHiveFlat();
+    return this.executeLocked(async () => {
+      return await this.loadHiveFlat();
+    });
   }
 
   /**
@@ -154,12 +177,14 @@ class Registry {
    */
   async getKeys(path: string): Promise<string[]> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    const keyNode = this.findKeyNode(rawHive, path);
-    if (!keyNode) return [];
-    return keyNode.content
-      .filter((node): node is RegistryKeyNode => node.type === 'key')
-      .map((node) => node.name);
+    return this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      const keyNode = this.findKeyNode(rawHive, path);
+      if (!keyNode) return [];
+      return keyNode.content
+        .filter((node): node is RegistryKeyNode => node.type === 'key')
+        .map((node) => node.name);
+    });
   }
 
   /**
@@ -167,43 +192,52 @@ class Registry {
    */
   async getValues(path: string): Promise<Record<string, RegistryValue>> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    const keyNode = this.findKeyNode(rawHive, path);
-    if (!keyNode) return {};
+    return this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      const keyNode = this.findKeyNode(rawHive, path);
+      if (!keyNode) return {};
 
-    const values: Record<string, RegistryValue> = {};
-    for (const node of keyNode.content) {
-      if (node.type !== 'key') {
-        values[node.name] = node.content;
+      const values: Record<string, RegistryValue> = {};
+      for (const node of keyNode.content) {
+        if (node.type !== 'key') {
+          values[node.name] = node.content;
+        }
       }
-    }
-    return values;
+      return values;
+    });
   }
 
   async deleteKey(path: string): Promise<void> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : "";
-    const keyName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
-    
-    if (!parentPath) {
-      const index = rawHive.findIndex(n => n.type === 'key' && n.name === keyName);
-      if (index >= 0) {
-        rawHive.splice(index, 1);
-        await this.saveHiveRaw(rawHive);
-        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+    let deleted = false;
+    await this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      const parentPath = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : "";
+      const keyName = path.includes('/') ? path.slice(path.lastIndexOf('/') + 1) : path;
+      
+      if (!parentPath) {
+        const index = rawHive.findIndex(n => n.type === 'key' && n.name === keyName);
+        if (index >= 0) {
+          rawHive.splice(index, 1);
+          await this.saveHiveRaw(rawHive);
+          deleted = true;
+        }
+        return;
       }
-      return;
-    }
 
-    const parentNode = this.findKeyNode(rawHive, parentPath);
-    if (parentNode) {
-      const index = parentNode.content.findIndex(n => n.type === 'key' && n.name === keyName);
-      if (index >= 0) {
-        parentNode.content.splice(index, 1);
-        await this.saveHiveRaw(rawHive);
-        window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
+      const parentNode = this.findKeyNode(rawHive, parentPath);
+      if (parentNode) {
+        const index = parentNode.content.findIndex(n => n.type === 'key' && n.name === keyName);
+        if (index >= 0) {
+          parentNode.content.splice(index, 1);
+          await this.saveHiveRaw(rawHive);
+          deleted = true;
+        }
       }
+    });
+
+    if (deleted) {
+      window.dispatchEvent(new CustomEvent('reg-update', { detail: { path, value: null } }));
     }
   }
 
@@ -274,13 +308,15 @@ class Registry {
 
     for (const node of data) {
       const content = JSON.stringify(node, null, 2);
-      const path = `${this.SYSTEM_DIR}/${node.name}.reg`;
-      await vfs.writeFile(path, content);
+      const tmpPath = `${this.SYSTEM_DIR}/${node.name}.tmp`;
+      const finalPath = `${this.SYSTEM_DIR}/${node.name}.reg`;
+      await vfs.writeFile(tmpPath, content);
+      await vfs.rename(tmpPath, `${node.name}.reg`);
       savedFileNames.add(`${node.name}.reg`);
     }
 
     for (const file of existingFiles) {
-      if (file.name.endsWith('.reg') && !savedFileNames.has(file.name)) {
+      if ((file.name.endsWith('.reg') || file.name.endsWith('.tmp')) && !savedFileNames.has(file.name)) {
         await vfs.delete(`${this.SYSTEM_DIR}/${file.name}`);
       }
     }
@@ -474,9 +510,11 @@ class Registry {
   /** Exports the entire registry hive as a JSON Blob for download. */
   async exportHive(): Promise<Blob> {
     await this.ensureInitialized();
-    const rawHive = await this.loadHiveRaw();
-    const json = JSON.stringify(rawHive, null, 2);
-    return new Blob([json], { type: 'application/json' });
+    return this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      const json = JSON.stringify(rawHive, null, 2);
+      return new Blob([json], { type: 'application/json' });
+    });
   }
 
   /** Imports a registry hive from a JSON Blob, overwriting the current hive. */
@@ -487,13 +525,15 @@ class Registry {
     if (!Array.isArray(parsed) || !parsed.every((node) => this.isRegistryNode(node))) {
       throw new Error('Invalid registry hive format.');
     }
-    await this.saveHiveRaw(parsed as RegistryNode[]);
+    await this.executeLocked(async () => {
+      await this.saveHiveRaw(parsed as RegistryNode[]);
+    });
     window.dispatchEvent(new CustomEvent('reg-update'));
   }
 
   /** Groundwork for Setup/Recovery: Wipes the system hive */
   async factoryReset() {
-    await vfs.delete(this.HIVE_PATH);
+    await vfs.delete(this.SYSTEM_DIR);
     window.location.reload();
   }
 }

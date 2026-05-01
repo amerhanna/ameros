@@ -59,7 +59,7 @@ export function getBundledApps(): ApplicationRegistry {
 class AppService {
   private readonly BUNDLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/Applications';
   private readonly INSTALLED_APPS_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps';
-  private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Items';
+  private readonly START_MENU_KEY = 'HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu';
   private readonly STARTUP_KEY = 'HKEY_CURRENT_USER/SOFTWARE/AmerOS/Startup';
 
   private initialized = false;
