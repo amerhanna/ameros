@@ -69,6 +69,36 @@
         "content": [{ "name": "default", "type": "string", "content": "pdffile" }]
       },
       {
+        "name": ".docx",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "docxfile" }]
+      },
+      {
+        "name": "docxfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Word Document" },
+          { "name": "DefaultIcon", "type": "string", "content": "FileText" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "DocsViewer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
         "name": "pdffile",
         "type": "key",
         "content": [
@@ -317,7 +347,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -388,6 +418,14 @@
                     "content": [
                       { "name": "label", "type": "string", "content": "PDF Viewer" },
                       { "name": "component", "type": "string", "content": "PDFViewer" }
+                    ]
+                  },
+                  {
+                    "name": "DocsViewer",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Docs Viewer" },
+                      { "name": "component", "type": "string", "content": "DocsViewer" }
                     ]
                   },
                   {
@@ -624,6 +662,17 @@
                     "type": "key",
                     "content": [
                       { "name": "icon", "type": "string", "content": "📕" },
+                      { "name": "width", "type": "number", "content": 800 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "DocsViewer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "📝" },
                       { "name": "width", "type": "number", "content": 800 },
                       { "name": "height", "type": "number", "content": 600 },
                       { "name": "resizable", "type": "boolean", "content": true },
