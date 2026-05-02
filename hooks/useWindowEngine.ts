@@ -360,6 +360,13 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
     },
     [],
   );
+  
+  const setWindowTitle = useCallback((id: string, title: string) => {
+    const w = getWindowStoreState().find(win => win.id === id);
+    if (w && w.title !== title) {
+      updateWindowInStore(id, { title });
+    }
+  }, []);
 
   const handleTaskbarWindowSelect = useCallback(
     (id: string) => {
@@ -402,6 +409,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
     focusWindow,
     moveWindow,
     resizeWindow,
+    setWindowTitle,
     handleTaskbarWindowSelect,
     blockedWindowIds,
     setOnLaunchError,

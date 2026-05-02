@@ -9,6 +9,7 @@ import { appService } from "@/lib/app-service";
 import { setWindowsState } from "@/lib/window-store";
 import type { StartMenuItem, InstalledApp } from "@/types/window";
 import Image from "next/image";
+import { DebouncedInput } from "@/components/ui/debounced-input";
 
 function isValidHttpUrl(value: string): boolean {
   try {
@@ -48,6 +49,33 @@ function getFaviconUrl(urlString: string): string {
     return "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(urlString);
   }
 }
+
+const FEATURED_APPS = [
+  {
+    id: "wikipedia",
+    label: "Wikipedia",
+    url: "https://www.wikipedia.org",
+    iconUrl: "https://www.google.com/s2/favicons?domain=wikipedia.org&sz=128",
+  },
+  {
+    id: "photopea",
+    label: "Photopea",
+    url: "https://www.photopea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=photopea.com&sz=128",
+  },
+  {
+    id: "vectorpea",
+    label: "Vectorpea",
+    url: "https://www.vectorpea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128",
+  },
+  {
+    id: "jampea",
+    label: "Jampea",
+    url: "https://jampea.com/",
+    iconUrl: "https://www.google.com/s2/favicons?domain=jampea.com&sz=128",
+  },
+];
 
 export default function InstallerApp() {
   const [url, setUrl] = useState("");
@@ -162,7 +190,8 @@ export default function InstallerApp() {
     await appService.addToStartMenu(appId, {
       label: externalLabel,
       component: 'WebApp',
-      launchArgs: appData.launchArgs
+      launchArgs: appData.launchArgs,
+      icon: iconUrl
     });
 
     setUrl("");
@@ -171,9 +200,56 @@ export default function InstallerApp() {
     setError("");
   }
 
+  async function renameApp(appId: string, newLabel: string) {
+    const appPath = `HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/InstalledApps/${appId}`;
+    await registry.set(`${appPath}/label`, newLabel);
+    
+    // Update launch args title too
+    const launchArgs = await registry.get<any>(`${appPath}/launchArgs`, null);
+    if (launchArgs) {
+      launchArgs.title = newLabel;
+      await registry.set(`${appPath}/launchArgs`, launchArgs);
+    }
+
+    // Update start menu label
+    const startMenuPath = `HKEY_LOCAL_MACHINE/SOFTWARE/AmerOS/StartMenu/Programs/${appId}`;
+    if (await registry.hasKey(startMenuPath)) {
+      await registry.set(`${startMenuPath}/label`, newLabel);
+      if (launchArgs) {
+        await registry.set(`${startMenuPath}/launchArgs`, launchArgs);
+      }
+    }
+    
+    // Refresh list
+    const apps = await appService.listInstalledApps();
+    setInstalledApps(apps);
+  }
+
   async function uninstallApp(appId: string, itemUrl: string) {
     await appService.uninstallApp(appId);
     setWindowsState((prev) => prev.filter((w) => !(w.component === 'WebApp' && w.launchArgs?.url === itemUrl)));
+  }
+
+  async function installFeaturedApp(app: typeof FEATURED_APPS[0]) {
+    const appData: Omit<InstalledApp, 'installDate'> = {
+      id: app.id,
+      label: app.label,
+      type: 'website',
+      iconUrl: app.iconUrl,
+      launchArgs: {
+        url: app.url,
+        title: app.label,
+        iconUrl: app.iconUrl,
+      },
+    };
+
+    await appService.installApp(appData);
+    await appService.addToStartMenu(app.id, {
+      label: app.label,
+      component: 'WebApp',
+      launchArgs: appData.launchArgs,
+      icon: app.iconUrl
+    });
   }
 
   return (
@@ -196,6 +272,16 @@ export default function InstallerApp() {
           {!validUrl && url && (
             <p className="text-sm text-red-500">URL must start with http:// or https://</p>
           )}
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-muted-foreground">App Name</label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Application Name"
+              aria-label="Application name"
+            />
+          </div>
 
           <div className="p-3 border rounded-md bg-muted">
             <p className="text-sm font-medium">Discovery Preview</p>
@@ -234,6 +320,49 @@ export default function InstallerApp() {
         </CardFooter>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Recommended Web Apps</CardTitle>
+          <CardDescription>
+            Quickly install popular web applications to your AmerOS desktop.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {FEATURED_APPS.map((app) => {
+              const isInstalled = installedApps.some(a => a.id === app.id);
+              return (
+                <div key={app.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 relative flex-shrink-0">
+                      <Image
+                        src={app.iconUrl}
+                        fill
+                        alt={app.label}
+                        className="rounded object-contain"
+                        unoptimized
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{app.label}</span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">{app.url}</span>
+                    </div>
+                  </div>
+                  <Button 
+                    variant={isInstalled ? "secondary" : "outline"} 
+                    size="sm"
+                    disabled={isInstalled}
+                    onClick={() => installFeaturedApp(app)}
+                  >
+                    {isInstalled ? "Installed" : "Install"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {installedApps.length > 0 && (
         <Card>
           <CardHeader>
@@ -251,7 +380,16 @@ export default function InstallerApp() {
                       alt="icon"
                       className="rounded"
                     />
-                    <span>{item.label}</span>
+                    <div className="flex flex-col">
+                      <DebouncedInput
+                        value={item.label}
+                        className="h-7 py-0 px-2 text-sm w-32 sm:w-48"
+                        onChange={(e) => renameApp(item.id, e.target.value)}
+                      />
+                      <span className="text-[10px] text-muted-foreground px-2 truncate max-w-[150px]">
+                        {item.launchArgs.url}
+                      </span>
+                    </div>
                   </div>
                   <Button variant="destructive" size="sm" onClick={() => uninstallApp(item.id, item.launchArgs.url)}>
                     Uninstall

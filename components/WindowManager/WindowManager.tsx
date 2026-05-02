@@ -57,6 +57,7 @@ function DesktopContent({
     focusWindow,
     moveWindow,
     resizeWindow,
+    setWindowTitle,
     handleTaskbarWindowSelect,
     blockedWindowIds,
     setOnLaunchError,
@@ -146,6 +147,7 @@ function DesktopContent({
             onContextMenu={openWindowMenu}
             setBeforeClose={(fn) => setWindowBeforeClose(window.id, fn)}
             openChildWindow={(config) => openChildWindow(window.id, config)}
+            onSetTitle={setWindowTitle}
           >
             <WindowComponent {...(window.launchArgs || {})} />
           </Window>

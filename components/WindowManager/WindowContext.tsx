@@ -39,6 +39,7 @@ export interface WindowContextType {
   setBeforeClose: (fn: (() => boolean | Promise<boolean>) | undefined) => void;
   // Open an in-app child window (not in the registry — the app provides the component inline)
   openChildWindow: (config: ChildWindowConfig) => string | null;
+  setTitle: (title: string) => void;
 }
 
 export interface SystemActionsContextType {

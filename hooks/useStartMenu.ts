@@ -44,7 +44,8 @@ export function useStartMenu(additionalStartMenuItems: StartMenuItem[] = []) {
         menu.push({
           label: values.label as string,
           component: (values.component as string) || "WebApp",
-          launchArgs: values.launchArgs as any
+          launchArgs: values.launchArgs as any,
+          icon: values.icon as string
         });
       }
     }

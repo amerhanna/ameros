@@ -103,7 +103,15 @@ function MenuItem({ item, onClose }: MenuItemProps) {
       }}
     >
       <div className="flex items-center gap-2">
-        {item.icon && <span className="w-4 h-4 flex items-center justify-center">{item.icon}</span>}
+        {item.icon && (
+          <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+            {item.icon.startsWith("http") ? (
+              <img src={item.icon} alt="" className="w-4 h-4 object-contain" />
+            ) : (
+              item.icon
+            )}
+          </span>
+        )}
         <span className={item.type === "item" && item.bold ? "font-bold" : ""}>{item.label}</span>
       </div>
 

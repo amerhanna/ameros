@@ -188,6 +188,17 @@ class Registry {
   }
 
   /**
+   * Checks if a key exists at the specified path.
+   */
+  async hasKey(path: string): Promise<boolean> {
+    await this.ensureInitialized();
+    return this.executeLocked(async () => {
+      const rawHive = await this.loadHiveRaw();
+      return !!this.findKeyNode(rawHive, path);
+    });
+  }
+
+  /**
    * Returns all named values directly within the specified key path.
    */
   async getValues(path: string): Promise<Record<string, RegistryValue>> {
