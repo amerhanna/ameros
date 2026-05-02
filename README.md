@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-04-23.after-6c9d71f.support-user-startup-apps-on-boot
-> Baseline Commit: 6c9d71f
-> Baseline Summary: Support user startup apps on boot
-> Generated At (UTC): 2026-04-23T00:00:00Z
+> Doc Version: 2026-05-02.after-80eb34a.jampea-standalone
+> Baseline Commit: 80eb34a
+> Baseline Summary: jampea standalone
+> Generated At (UTC): 2026-05-02T22:21:16Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation

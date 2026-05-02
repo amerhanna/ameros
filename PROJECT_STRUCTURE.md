@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-04-23.after-6c9d71f.support-user-startup-apps-on-boot
-> Baseline Commit: 6c9d71f
-> Baseline Summary: Support user startup apps on boot
-> Generated At (UTC): 2026-04-23T00:00:00Z
+> Doc Version: 2026-05-02.after-80eb34a.jampea-standalone
+> Baseline Commit: 80eb34a
+> Baseline Summary: jampea standalone
+> Generated At (UTC): 2026-05-02T22:21:16Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -35,6 +35,9 @@ This document is versioned against a git commit summary so future agents can jud
     - `WebApp/`: Web view frame container.
     - `PDFViewer/`: PDF document viewer supporting VFS files and web URLs.
     - `TestCloseApp/`: Test application for close functionality.
+    - `Photopea/`: Advanced image and PSD editor leveraging Photopea via an iframe with bidirectional VFS integration.
+    - `Vectorpea/`: Vector graphics editor leveraging Vectorpea via an iframe with bidirectional VFS integration.
+    - `Jampea/`: Audio and MIDI file editor leveraging Jampea via an iframe with bidirectional VFS integration.
 - [**`components/`**](file:///c:/dev/personal/ameros/components): System-wide UI components.
     - `WindowManager/`: Core logic for `Window`, `WindowManager`, `Taskbar`, `StartMenu`, `MenuBar` and `ContextMenu`. Includes nested submenus support.
     - `SystemDialogs/`: Standard OS dialogs (e.g., `SaveDialog`, `OpenDialog`, `PropertiesDialog`).
@@ -43,6 +46,9 @@ This document is versioned against a git commit summary so future agents can jud
     - `TreeView.tsx` / `FolderTreeView.tsx`: Generic, reusable components for rendering hierarchical OS structures.
     - `ItemView.tsx`: Generic component for rendering content in list or grid form, with extensive context menus, loading, and error boundaries.
     - `FolderView.tsx`: Logic engine built on `ItemView` rendering file/folder icons (shared by Desktop and FileExplorer).
+    - `MyButton.tsx`: Button component.
+    - `RegistryFileDetails.tsx`: Component to display registry file details.
+    - `theme-provider.tsx`: Theme provider for system-wide light/dark modes.
 - [**`lib/`**](file:///c:/dev/personal/ameros/lib): Core OS-level services. **Note: ESLint restricts direct userland application logic from importing kernel-level APIs here directly.**
     - `vfs.ts`: **Virtual File System**. Handles IndexedDB storage and external `FileSystemHandle` mounts. Utilizes dedicated `VFSNode` structures (`DriveNode`, `FolderNode`, `FileNode`) and supports complete tree/change propagation across the OS.
     - `database.ts`: **OS Database Layer**. Powered by alaSQL, provides a per-app schema mapped and synced to `C:/System/AppData` via the VFS.
@@ -53,7 +59,10 @@ This document is versioned against a git commit summary so future agents can jud
     - `app-service.ts`: Manages system-wide application installation, registration, and Start Menu entries via the Registry.
     - `file-service.ts`: Handles file-to-application associations and icon resolution using the system Registry.
     - `registry-provider.tsx`: React provider for synchronous access to the registry across the application.
+    - `bundled-apps.ts`: Defines system bundled applications registry.
+    - `default-registry.json`: The default system registry state used during initialization.
     - `utils.ts`: Utility functions for the OS.
+    - `vfs-defaults/`: Default VFS tree structure data to seed the system upon initialization.
 - [**`hooks/`**](file:///c:/dev/personal/ameros/hooks): Custom React hooks providing system and UI logic.
     - `useSystemDialogs.tsx`: Manage system dialogs (Open/Save/Properties).
     - `useMessageBox.tsx`: Global message box interface (alert/confirm/error/prompt).
@@ -62,6 +71,8 @@ This document is versioned against a git commit summary so future agents can jud
     - `useMenuBar.ts`, `useStartMenu.ts`, `useDesktopContextMenu.ts`: Support for application-specific menus, start menu management, and global right-click behaviors.
     - `useLocalStorage.ts`: Hook for local storage management.
     - `useSystemActions.ts`: Hook for system actions.
+    - `use-toast.ts`: Hook for managing toast notifications.
+    - `use-mobile.ts`: Hook for detecting mobile viewports.
 - [**`types/`**](file:///c:/dev/personal/ameros/types): TypeScript definitions for windows, the VFS, UI menus/submenus, and application registry mapping.
 
 ## Core Concepts
@@ -78,7 +89,7 @@ Located in `lib/registry.ts`, AmerOS utilizes a hierarchical registry structure 
 Additionally, applications can leverage robust relational storage via the OS Database Layer (`lib/database.ts`). It provides an auto-persisting, file-backed SQL execution system. Active applications should utilize the `useDatabase()` hook entirely, which dynamically determines the caller's db namespace scope (`appId`), effectively maintaining isolation and safety.
 
 ### 4. Application Registry
-Apps are registered in `WindowManagerDemo.tsx` with metadata like icons, initial dimensions, resizability, and lifecycle hooks (e.g., `beforeClose`). Start Menu integrations can also contain deeply nested categorizations (e.g., grouping system utilities inside a submenu item).
+Apps are registered in `WindowManagerDemo.tsx` or using the Start Menu / registry services with metadata like icons, initial dimensions, resizability, and lifecycle hooks (e.g., `beforeClose`). Start Menu integrations can also contain deeply nested categorizations (e.g., grouping system utilities inside a submenu item).
 
 ### 5. OS Boot & Hardware Lifecycle
 A global `boot-sequencer.ts` ensures proper sequential OS initialization. Services such as VFS DB priming, registry synchronization, and theme injection safely run before unleashing the OS desktop, mimicking a native machine’s OS load process.
@@ -87,17 +98,8 @@ A global `boot-sequencer.ts` ensures proper sequential OS initialization. Servic
 
 ### Adding a New Application
 1. **Create the Component**: Add your app (e.g., `MyApp.tsx`) in `Applications/MyApp/`. Focus on using the unified generic layout elements.
-2. **Register the App**: In [**`app/components/WindowManagerDemo.tsx`**](file:///c:/dev/personal/ameros/app/components/WindowManagerDemo.tsx), add an entry to the `applicationRegistry`:
-   ```typescript
-   MyApp: {
-     component: MyApp,
-     icon: '🚀',
-     width: 400,
-     height: 300,
-     resizable: true,
-   }
-   ```
-3. **Add to Start Menu**: Include it inside `startMenuItems` in the same file. You can utilize the nested submenu types if adding an administrative tool.
+2. **Register the App**: Add it to `bundled-apps.ts` or dynamically register it.
+3. **Add to Start Menu**: Include it inside the Registry's start menu entries.
 
 ### Adding System Data
 If the data mimics a configuration setting or aesthetic preference, utilize `lib/registry.ts`. For complex relational layouts, local tables, or significant app state—use the SQL Database via `useDatabase()`. For generic non-relational files or assets, interface with `lib/vfs.ts`. All of these engines broadcast events enabling fully reactive system APIs.
