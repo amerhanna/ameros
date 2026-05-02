@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-05-02.after-80eb34a.jampea-standalone
-> Baseline Commit: 80eb34a
-> Baseline Summary: jampea standalone
-> Generated At (UTC): 2026-05-02T22:21:16Z
+> Doc Version: 2026-05-02.after-4b6137a.add-docx-viewer
+> Baseline Commit: 4b6137a
+> Baseline Summary: add docx viewer
+> Generated At (UTC): 2026-05-02T23:07:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -38,6 +38,8 @@ This document is versioned against a git commit summary so future agents can jud
     - `Photopea/`: Advanced image and PSD editor leveraging Photopea via an iframe with bidirectional VFS integration.
     - `Vectorpea/`: Vector graphics editor leveraging Vectorpea via an iframe with bidirectional VFS integration.
     - `Jampea/`: Audio and MIDI file editor leveraging Jampea via an iframe with bidirectional VFS integration.
+    - `DocsViewer/`: Word Document (`.docx`) viewer using docx-preview to render documents directly from the VFS.
+    - `MusicPlayer/`: Music and playlist player with VFS support, featuring standard media controls and `.m3u` parsing.
 - [**`components/`**](file:///c:/dev/personal/ameros/components): System-wide UI components.
     - `WindowManager/`: Core logic for `Window`, `WindowManager`, `Taskbar`, `StartMenu`, `MenuBar` and `ContextMenu`. Includes nested submenus support.
     - `SystemDialogs/`: Standard OS dialogs (e.g., `SaveDialog`, `OpenDialog`, `PropertiesDialog`).

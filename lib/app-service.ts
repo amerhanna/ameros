@@ -36,6 +36,7 @@ export async function loadBundledApps(): Promise<ApplicationRegistry> {
       minimizable: values.minimizable as boolean ?? true,
       minWidth: values.minWidth as number,
       minHeight: values.minHeight as number,
+      acceptsMessages: values.acceptsMessages as boolean ?? false,
       ...bundledHandlers[appKey], // Merge special handlers
     };
   }
@@ -65,6 +66,52 @@ class AppService {
   private initialized = false;
   private initPromise: Promise<void> | null = null;
   private applicationRegistry: ApplicationRegistry = {};
+  private openApps = new Map<string, { windowId: string, appId: string, messageHandler?: (msg: any) => boolean }>();
+
+  /**
+   * Registers an application window that is currently open.
+   */
+  registerOpenApp(windowId: string, appId: string) {
+    // Preserve existing message handler if re-registering
+    const existing = this.openApps.get(windowId);
+    this.openApps.set(windowId, { windowId, appId, messageHandler: existing?.messageHandler });
+  }
+
+  /**
+   * Unregisters a closed application window.
+   */
+  unregisterOpenApp(windowId: string) {
+    this.openApps.delete(windowId);
+  }
+
+  /**
+   * Registers a message handler for a specific application window.
+   */
+  registerMessageHandler(windowId: string, handler: ((msg: any) => boolean) | undefined) {
+    const app = this.openApps.get(windowId);
+    if (app) {
+      if (handler) {
+        app.messageHandler = handler;
+      } else {
+        delete app.messageHandler;
+      }
+    }
+  }
+
+  /**
+   * Sends a message to the first open instance of an application that successfully handles it.
+   * Returns the windowId of the instance that handled the message, or null if unhandled.
+   */
+  sendMessageToApp(appId: string, message: any): string | null {
+    for (const app of this.openApps.values()) {
+      if (app.appId === appId && app.messageHandler) {
+        if (app.messageHandler(message)) {
+          return app.windowId;
+        }
+      }
+    }
+    return null;
+  }
 
   /**
    * Registers a new application in the system registry.

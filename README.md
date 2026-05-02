@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-05-02.after-80eb34a.jampea-standalone
-> Baseline Commit: 80eb34a
-> Baseline Summary: jampea standalone
-> Generated At (UTC): 2026-05-02T22:21:16Z
+> Doc Version: 2026-05-02.after-4b6137a.add-docx-viewer
+> Baseline Commit: 4b6137a
+> Baseline Summary: add docx viewer
+> Generated At (UTC): 2026-05-02T23:07:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation
@@ -27,3 +27,4 @@ AmerOS is a React-based (Next.js) web application that simulates a desktop opera
 - **IndexedDB**: Persistent storage for the Virtual File System.
 - **@zenfs/core & @zenfs/dom**: File system abstraction for VFS.
 - **@zip.js/zip.js**: ZIP file handling.
+- **docx-preview & jszip**: Word document preview functionality.

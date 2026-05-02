@@ -64,6 +64,46 @@
         ]
       },
       {
+        "name": ".mp3",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "musicfile" }]
+      },
+      {
+        "name": ".wav",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "musicfile" }]
+      },
+      {
+        "name": ".m3u",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "musicfile" }]
+      },
+      {
+        "name": "musicfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Music File" },
+          { "name": "DefaultIcon", "type": "string", "content": "Music" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "MusicPlayer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
         "name": ".pdf",
         "type": "key",
         "content": [{ "name": "default", "type": "string", "content": "pdffile" }]
@@ -347,7 +387,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -442,6 +482,14 @@
                     "content": [
                       { "name": "label", "type": "string", "content": "File Explorer" },
                       { "name": "component", "type": "string", "content": "FileExplorer" }
+                    ]
+                  },
+                  {
+                    "name": "MusicPlayer",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Music Player" },
+                      { "name": "component", "type": "string", "content": "MusicPlayer" }
                     ]
                   },
                   {
@@ -560,6 +608,20 @@
                       { "name": "resizable", "type": "boolean", "content": true },
                       { "name": "minWidth", "type": "number", "content": 300 },
                       { "name": "minHeight", "type": "number", "content": 200 }
+                    ]
+                  },
+                  {
+                    "name": "MusicPlayer",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🎵" },
+                      { "name": "width", "type": "number", "content": 400 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "minWidth", "type": "number", "content": 300 },
+                      { "name": "minHeight", "type": "number", "content": 400 },
+                      { "name": "maximizable", "type": "boolean", "content": true },
+                      { "name": "acceptsMessages", "type": "boolean", "content": true }
                     ]
                   },
                   {

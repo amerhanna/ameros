@@ -13,6 +13,7 @@ import {
   setWindowsState,
   updateWindow as updateWindowInStore,
 } from '@/lib/window-store';
+import { appService } from '@/lib/app-service';
 
 /**
  * Configuration payload used when spawning attached popup/child windows from an existing generic application.
@@ -63,6 +64,9 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
 
   useEffect(() => {
     initWindowStore(persistentRef.current);
+    persistentRef.current.forEach(w => {
+      appService.registerOpenApp(w.id, w.appId);
+    });
     setMounted(true);
   }, []);
 
@@ -158,6 +162,7 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
         return [...prev, newWindow];
       });
 
+      appService.registerOpenApp(id, componentId);
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
 
@@ -187,9 +192,11 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
 
       delete beforeCloseHandlersRef.current[id];
       delete childComponentsRef.current[id];
+      appService.unregisterOpenApp(id);
       childIds.forEach((childId) => {
         delete beforeCloseHandlersRef.current[childId];
         delete childComponentsRef.current[childId];
+        appService.unregisterOpenApp(childId);
       });
 
       const newWindows = prev.filter((w) => w.id !== id && w.parentWindowId !== id);
@@ -202,14 +209,48 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
     [applicationRegistry, setActiveWindowId],
   );
 
+  const focusWindow = useCallback(
+    (id: string) => {
+      const store = getWindowStoreState();
+      const hasModalChild = store.some((w) => w.parentWindowId === id && w.modal && !w.isMinimized);
+      if (hasModalChild) {
+        const modalChild = store.find((w) => w.parentWindowId === id && w.modal && !w.isMinimized);
+        if (modalChild) {
+          setWindowsState((prev) => prev.map((w) => (w.id === modalChild.id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)));
+          setActiveWindowId(modalChild.id);
+          setNextZIndex((prev) => prev + 1);
+        }
+        return;
+      }
+
+      setWindowsState((prev) => prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)));
+      setActiveWindowId(id);
+      setNextZIndex((prev) => prev + 1);
+    },
+    [nextZIndex, setActiveWindowId, setNextZIndex],
+  );
+
   const launchApp = useCallback(
-    (component: string | React.ComponentType<any>, config?: Partial<WindowConfig>) => {
+    (componentId: string | React.ComponentType<any>, config?: Partial<WindowConfig>) => {
+      if (typeof componentId === 'string') {
+        const app = applicationRegistry[componentId];
+        if (app?.acceptsMessages) {
+          const handledWindowId = appService.sendMessageToApp(componentId, {
+            type: 'LAUNCH_ARGS',
+            payload: config?.launchArgs,
+          });
+          if (handledWindowId) {
+            focusWindow(handledWindowId);
+            return handledWindowId;
+          }
+        }
+      }
       return openWindow({
-        component,
+        component: componentId,
         ...config,
       });
     },
-    [openWindow],
+    [openWindow, applicationRegistry, focusWindow],
   );
 
   const openChildWindow = useCallback(
@@ -306,29 +347,6 @@ export function useWindowEngine(applicationRegistry: ApplicationRegistry = {}) {
           return w;
         }),
       );
-      setActiveWindowId(id);
-      setNextZIndex((prev) => prev + 1);
-    },
-    [nextZIndex, setActiveWindowId, setNextZIndex],
-  );
-
-  const focusWindow = useCallback(
-    (id: string) => {
-      const store = getWindowStoreState();
-      const hasModalChild = store.some((w) => w.parentWindowId === id && w.modal && !w.isMinimized);
-      if (hasModalChild) {
-        const modalChild = store.find((w) => w.parentWindowId === id && w.modal && !w.isMinimized);
-        if (modalChild) {
-          setWindowsState((prev) =>
-            prev.map((w) => (w.id === modalChild.id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)),
-          );
-          setActiveWindowId(modalChild.id);
-          setNextZIndex((prev) => prev + 1);
-        }
-        return;
-      }
-
-      setWindowsState((prev) => prev.map((w) => (w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w)));
       setActiveWindowId(id);
       setNextZIndex((prev) => prev + 1);
     },

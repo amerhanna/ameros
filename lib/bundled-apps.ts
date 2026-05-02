@@ -19,6 +19,7 @@ import PDFViewer from '@/Applications/PDFViewer/PDFViewer';
 import Photopea from '@/Applications/Photopea/Photopea';
 import Vectorpea from '@/Applications/Vectorpea/Vectorpea';
 import DocsViewer from '@/Applications/DocsViewer/DocsViewer';
+import MusicPlayer from '@/Applications/MusicPlayer/MusicPlayer';
 
 /**
  * Map of bundled application component names to their React components.
@@ -42,6 +43,7 @@ export const bundledComponents: Record<string, React.ComponentType<any>> = {
   Vectorpea,
   Jampea,
   DocsViewer,
+  MusicPlayer,
 };
 
 /**

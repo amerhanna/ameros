@@ -71,6 +71,7 @@ export interface Application {
   maximizable?: boolean
   minimizable?: boolean
   beforeClose?: () => boolean
+  acceptsMessages?: boolean
 }
 
 export type ApplicationRegistry = Record<string, Application>
