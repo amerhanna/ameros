@@ -182,6 +182,36 @@
             ]
           }
         ]
+      },
+      {
+        "name": ".svg",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "svgfile" }]
+      },
+      {
+        "name": "svgfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Scalable Vector Graphics" },
+          { "name": "DefaultIcon", "type": "string", "content": "ImageIcon" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Vectorpea"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -291,9 +321,8 @@
                         "type": "key",
                         "content": [
                           { "name": "label", "type": "string", "content": "Vectorpea" },
-                          { "name": "component", "type": "string", "content": "WebApp" },
-                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128" },
-                          { "name": "launchArgs", "type": "object", "content": { "url": "https://www.vectorpea.com/", "title": "Vectorpea", "iconUrl": "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128" } }
+                          { "name": "component", "type": "string", "content": "Vectorpea" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=vectorpea.com&sz=128" }
                         ]
                       },
                       {
@@ -577,6 +606,17 @@
                     "type": "key",
                     "content": [
                       { "name": "icon", "type": "string", "content": "🎨" },
+                      { "name": "width", "type": "number", "content": 1000 },
+                      { "name": "height", "type": "number", "content": 700 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Vectorpea",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🖋️" },
                       { "name": "width", "type": "number", "content": 1000 },
                       { "name": "height", "type": "number", "content": 700 },
                       { "name": "resizable", "type": "boolean", "content": true },
