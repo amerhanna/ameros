@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-05-02.after-4b6137a.add-docx-viewer
-> Baseline Commit: 4b6137a
-> Baseline Summary: add docx viewer
-> Generated At (UTC): 2026-05-02T23:07:00Z
+> Doc Version: 2026-05-02.after-7026599.basic-music-player
+> Baseline Commit: 7026599
+> Baseline Summary: basic music player
+> Generated At (UTC): 2026-05-02T23:36:11Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -70,7 +70,8 @@ This document is versioned against a git commit summary so future agents can jud
     - `useMessageBox.tsx`: Global message box interface (alert/confirm/error/prompt).
     - `useDatabase.ts`: Allows active applications to safely and simply execute SQL queries through `lib/database.ts`, enforcing bounds dynamically using the caller's WindowContext `appId`.
     - `useWindowEngine.ts`, `useWindowActions.ts`, `useGetWindowState.ts`: Core abstractions to operate the Window manager from child contexts or isolated apps.
-    - `useMenuBar.ts`, `useStartMenu.ts`, `useDesktopContextMenu.ts`: Support for application-specific menus, start menu management, and global right-click behaviors.
+    - `useStartMenu.ts`, `useDesktopContextMenu.ts`: Support for start menu management, and global right-click behaviors.
+    - `useAppMessage.ts`: Hook for applications to receive IPC messages (like file open requests) to support single-instance behavior.
     - `useLocalStorage.ts`: Hook for local storage management.
     - `useSystemActions.ts`: Hook for system actions.
     - `use-toast.ts`: Hook for managing toast notifications.
@@ -91,7 +92,7 @@ Located in `lib/registry.ts`, AmerOS utilizes a hierarchical registry structure 
 Additionally, applications can leverage robust relational storage via the OS Database Layer (`lib/database.ts`). It provides an auto-persisting, file-backed SQL execution system. Active applications should utilize the `useDatabase()` hook entirely, which dynamically determines the caller's db namespace scope (`appId`), effectively maintaining isolation and safety.
 
 ### 4. Application Registry
-Apps are registered in `WindowManagerDemo.tsx` or using the Start Menu / registry services with metadata like icons, initial dimensions, resizability, and lifecycle hooks (e.g., `beforeClose`). Start Menu integrations can also contain deeply nested categorizations (e.g., grouping system utilities inside a submenu item).
+Apps are registered in `WindowManagerDemo.tsx` or using the Start Menu / registry services with metadata like icons, initial dimensions, resizability, and lifecycle hooks (e.g., `beforeClose`). Start Menu integrations can also contain deeply nested categorizations (e.g., grouping system utilities inside a submenu item). Single-instance messaging is also supported via `useAppMessage.ts`.
 
 ### 5. OS Boot & Hardware Lifecycle
 A global `boot-sequencer.ts` ensures proper sequential OS initialization. Services such as VFS DB priming, registry synchronization, and theme injection safely run before unleashing the OS desktop, mimicking a native machine’s OS load process.
