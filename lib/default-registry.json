@@ -212,6 +212,36 @@
             ]
           }
         ]
+      },
+      {
+        "name": ".mid",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "midfile" }]
+      },
+      {
+        "name": "midfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "MIDI Sequence" },
+          { "name": "DefaultIcon", "type": "string", "content": "Music" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Jampea"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -330,9 +360,8 @@
                         "type": "key",
                         "content": [
                           { "name": "label", "type": "string", "content": "Jampea" },
-                          { "name": "component", "type": "string", "content": "WebApp" },
-                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=jampea.com&sz=128" },
-                          { "name": "launchArgs", "type": "object", "content": { "url": "https://jampea.com/", "title": "Jampea", "iconUrl": "https://www.google.com/s2/favicons?domain=jampea.com&sz=128" } }
+                          { "name": "component", "type": "string", "content": "Jampea" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=jampea.com&sz=128" }
                         ]
                       }
                     ]
@@ -617,6 +646,17 @@
                     "type": "key",
                     "content": [
                       { "name": "icon", "type": "string", "content": "🖋️" },
+                      { "name": "width", "type": "number", "content": 1000 },
+                      { "name": "height", "type": "number", "content": 700 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Jampea",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🎹" },
                       { "name": "width", "type": "number", "content": 1000 },
                       { "name": "height", "type": "number", "content": 700 },
                       { "name": "resizable", "type": "boolean", "content": true },

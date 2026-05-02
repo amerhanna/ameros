@@ -13,6 +13,7 @@ import InstallerApp from '@/Applications/Installer/InstallerApp';
 import WebApp from '@/Applications/WebApp/WebApp';
 import Regedit from '@/Applications/Regedit/Regedit';
 import DBExplorer from '@/Applications/DBExplorer/DBExplorer';
+import Jampea from '@/Applications/Jampea/Jampea';
 import Notes from '@/Applications/Notes/Notes';
 import PDFViewer from '@/Applications/PDFViewer/PDFViewer';
 import Photopea from '@/Applications/Photopea/Photopea';
@@ -38,6 +39,7 @@ export const bundledComponents: Record<string, React.ComponentType<any>> = {
   PDFViewer,
   Photopea,
   Vectorpea,
+  Jampea,
 };
 
 /**
