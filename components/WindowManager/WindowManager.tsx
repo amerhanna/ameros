@@ -92,13 +92,22 @@ function DesktopContent({
         if (wallpaperPath) {
           const file = await vfs.readFile(wallpaperPath);
           const url = URL.createObjectURL(file);
-          setBgUrl(url);
+          setBgUrl(prev => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
         } else {
-          setBgUrl(null);
+          setBgUrl(prev => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+          });
         }
       } catch (err) {
         console.warn("Failed to load wallpaper", err);
-        setBgUrl(null);
+        setBgUrl(prev => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
       }
     };
 
@@ -111,9 +120,19 @@ function DesktopContent({
       }
     };
 
+    const handleVfsChange = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const wallpaperPath = await registry.get<string>("HKEY_CURRENT_USER/Control Panel/Desktop/Wallpaper", "/System/Wallpaper/ameros-bg.png");
+      if (detail && detail.path === wallpaperPath) {
+        loadWallpaper();
+      }
+    };
+
     window.addEventListener('reg-update', handleRegUpdate);
+    window.addEventListener('vfs-change', handleVfsChange);
     return () => {
       window.removeEventListener('reg-update', handleRegUpdate);
+      window.removeEventListener('vfs-change', handleVfsChange);
     };
   }, []);
 

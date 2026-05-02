@@ -92,6 +92,96 @@
             ]
           }
         ]
+      },
+      {
+        "name": ".psd",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "psdfile" }]
+      },
+      {
+        "name": "psdfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "Photoshop Document" },
+          { "name": "DefaultIcon", "type": "string", "content": "ImageIcon" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Photopea"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": ".png",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "pngfile" }]
+      },
+      {
+        "name": "pngfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "PNG Image" },
+          { "name": "DefaultIcon", "type": "string", "content": "ImageIcon" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Photopea"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": ".jpg",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "jpgfile" }]
+      },
+      {
+        "name": "jpgfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "JPEG Image" },
+          { "name": "DefaultIcon", "type": "string", "content": "ImageIcon" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "Photopea"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -192,9 +282,8 @@
                         "type": "key",
                         "content": [
                           { "name": "label", "type": "string", "content": "Photopea" },
-                          { "name": "component", "type": "string", "content": "WebApp" },
-                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=photopea.com&sz=128" },
-                          { "name": "launchArgs", "type": "object", "content": { "url": "https://www.photopea.com/", "title": "Photopea", "iconUrl": "https://www.google.com/s2/favicons?domain=photopea.com&sz=128" } }
+                          { "name": "component", "type": "string", "content": "Photopea" },
+                          { "name": "icon", "type": "string", "content": "https://www.google.com/s2/favicons?domain=photopea.com&sz=128" }
                         ]
                       },
                       {
@@ -479,6 +568,17 @@
                       { "name": "icon", "type": "string", "content": "📕" },
                       { "name": "width", "type": "number", "content": 800 },
                       { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "Photopea",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🎨" },
+                      { "name": "width", "type": "number", "content": 1000 },
+                      { "name": "height", "type": "number", "content": 700 },
                       { "name": "resizable", "type": "boolean", "content": true },
                       { "name": "maximizable", "type": "boolean", "content": true }
                     ]
