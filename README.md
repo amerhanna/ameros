@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-05-02.after-7026599.basic-music-player
-> Baseline Commit: 7026599
-> Baseline Summary: basic music player
-> Generated At (UTC): 2026-05-02T23:36:11Z
+> Doc Version: 2026-06-10.after-7dcdcba.docs-update-baseline-version-and-document-new-useappmessage-hook-for-ipc-support
+> Baseline Commit: 7dcdcba
+> Baseline Summary: docs: update baseline version and document new useAppMessage hook for IPC support
+> Generated At (UTC): 2026-06-10T18:58:11Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation

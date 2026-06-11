@@ -9,6 +9,41 @@
         "content": [{ "name": "default", "type": "string", "content": "txtfile" }]
       },
       {
+        "name": ".html",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "htmlfile" }]
+      },
+      {
+        "name": ".htm",
+        "type": "key",
+        "content": [{ "name": "default", "type": "string", "content": "htmlfile" }]
+      },
+      {
+        "name": "htmlfile",
+        "type": "key",
+        "content": [
+          { "name": "default", "type": "string", "content": "HTML Document" },
+          { "name": "DefaultIcon", "type": "string", "content": "Chrome" },
+          {
+            "name": "shell",
+            "type": "key",
+            "content": [
+              {
+                "name": "open",
+                "type": "key",
+                "content": [
+                  {
+                    "name": "command",
+                    "type": "string",
+                    "content": "HtmlReader"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
         "name": "txtfile",
         "type": "key",
         "content": [
@@ -387,7 +422,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "HtmlReader", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -450,6 +485,14 @@
                     "content": [
                       { "name": "label", "type": "string", "content": "Text Editor" },
                       { "name": "component", "type": "string", "content": "TextEditor" }
+                    ]
+                  },
+                  {
+                    "name": "HtmlReader",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "HTML Reader" },
+                      { "name": "component", "type": "string", "content": "HtmlReader" }
                     ]
                   },
                   {
@@ -584,6 +627,19 @@
                       { "name": "resizable", "type": "boolean", "content": true },
                       { "name": "minWidth", "type": "number", "content": 300 },
                       { "name": "minHeight", "type": "number", "content": 200 },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
+                  {
+                    "name": "HtmlReader",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🌐" },
+                      { "name": "width", "type": "number", "content": 800 },
+                      { "name": "height", "type": "number", "content": 600 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "minWidth", "type": "number", "content": 400 },
+                      { "name": "minHeight", "type": "number", "content": 300 },
                       { "name": "maximizable", "type": "boolean", "content": true }
                     ]
                   },

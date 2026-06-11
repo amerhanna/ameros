@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-05-02.after-7026599.basic-music-player
-> Baseline Commit: 7026599
-> Baseline Summary: basic music player
-> Generated At (UTC): 2026-05-02T23:36:11Z
+> Doc Version: 2026-06-10.after-7dcdcba.docs-update-baseline-version-and-document-new-useappmessage-hook-for-ipc-support
+> Baseline Commit: 7dcdcba
+> Baseline Summary: docs: update baseline version and document new useAppMessage hook for IPC support
+> Generated At (UTC): 2026-06-10T18:58:11Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -23,23 +23,24 @@ This document is versioned against a git commit summary so future agents can jud
     - `layout.tsx`: Root layout, includes the `ClipboardProvider`, `RegistryProvider`, and global theming.
     - `page.tsx`: Entry point, renders the `WindowManagerDemo`.
 - [**`Applications/`**](file:///c:/dev/personal/ameros/Applications): Contains individual OS applications.
-    - `FileExplorer/`: A fully functional file explorer with support for external mounts (FSA API).
-    - `Regedit/`: Tree-based Registry Editor allowing hierarchical view and modification of system settings.
+    - `Calculator/`: Basic calculator application.
     - `DBExplorer/`: System database explorer. Discovers `.db.json` files and provides an SQL console and table UI tools.
-    - `Notes/`: Simple notes application demonstrating built-in SQL database operations (`useDatabase`).
-    - `DemoApp/`: Detailed showcase of all system UI components.
-    - `Installer/`: OS/App Installer interface.
-    - `TextEditor/`: Simple text editing app.
-    - `Calculator/`: Basic calculator.
     - `DeepSeekHistory/`: DeepSeek Chat History explorer.
-    - `WebApp/`: Web view frame container.
-    - `PDFViewer/`: PDF document viewer supporting VFS files and web URLs.
-    - `TestCloseApp/`: Test application for close functionality.
-    - `Photopea/`: Advanced image and PSD editor leveraging Photopea via an iframe with bidirectional VFS integration.
-    - `Vectorpea/`: Vector graphics editor leveraging Vectorpea via an iframe with bidirectional VFS integration.
-    - `Jampea/`: Audio and MIDI file editor leveraging Jampea via an iframe with bidirectional VFS integration.
+    - `DemoApp/`: Detailed showcase of all system UI components.
     - `DocsViewer/`: Word Document (`.docx`) viewer using docx-preview to render documents directly from the VFS.
+    - `FileExplorer/`: A fully functional file explorer with support for external mounts (FSA API).
+    - `HtmlReader/`: HTML file reader that securely renders HTML contents within a sandboxed iframe.
+    - `Installer/`: OS/App Installer interface.
+    - `Jampea/`: Audio and MIDI file editor leveraging Jampea via an iframe with bidirectional VFS integration.
     - `MusicPlayer/`: Music and playlist player with VFS support, featuring standard media controls and `.m3u` parsing.
+    - `Notes/`: Simple notes application demonstrating built-in SQL database operations (`useDatabase`).
+    - `PDFViewer/`: PDF document viewer supporting VFS files and web URLs.
+    - `Photopea/`: Advanced image and PSD editor leveraging Photopea via an iframe with bidirectional VFS integration.
+    - `Regedit/`: Tree-based Registry Editor allowing hierarchical view and modification of system settings.
+    - `TestCloseApp/`: Test application for close functionality.
+    - `TextEditor/`: Simple text editing app.
+    - `Vectorpea/`: Vector graphics editor leveraging Vectorpea via an iframe with bidirectional VFS integration.
+    - `WebApp/`: Web view frame container.
 - [**`components/`**](file:///c:/dev/personal/ameros/components): System-wide UI components.
     - `WindowManager/`: Core logic for `Window`, `WindowManager`, `Taskbar`, `StartMenu`, `MenuBar` and `ContextMenu`. Includes nested submenus support.
     - `SystemDialogs/`: Standard OS dialogs (e.g., `SaveDialog`, `OpenDialog`, `PropertiesDialog`).
