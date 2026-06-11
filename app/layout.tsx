@@ -15,7 +15,6 @@ export const metadata: Metadata = {
 }
 
 import { ClipboardProvider } from "@/lib/clipboard";
-import { RegistryProvider } from "@/lib/registry-provider";
 import { Toaster } from '@/components/ui/sonner';
 
 export default function RootLayout({
@@ -27,11 +26,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <ClipboardProvider>
-          <RegistryProvider>
-            {children}
-            <Toaster />
-            <Analytics />
-          </RegistryProvider>
+          {children}
+          <Toaster />
+          <Analytics />
         </ClipboardProvider>
       </body>
     </html>

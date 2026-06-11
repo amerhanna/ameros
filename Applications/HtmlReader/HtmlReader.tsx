@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useSystemDialogs } from "@/hooks/useSystemDialogs";
 import { useAppMessage } from "@/hooks/useAppMessage";
 import { useGetWindowState } from "@/hooks/useGetWindowState";
-import { registry } from "@/lib/registry";
+import { useRegistry } from "@/hooks/useRegistry";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 
@@ -61,6 +61,7 @@ export default function HtmlReader({ filePath: initialFilePath }: HtmlReaderProp
   const { showOpenFileDialog } = useSystemDialogs();
   const [content, setContent] = useState("");
   const { appId } = useGetWindowState(["appId"]);
+  const registry = useRegistry();
 
   const [allowScripts, setAllowScripts] = useState(false);
   const [allowModals, setAllowModals] = useState(false);
@@ -68,13 +69,15 @@ export default function HtmlReader({ filePath: initialFilePath }: HtmlReaderProp
 
   const getRegistryKey = (path: string) => {
     const encodedPath = btoa(path).replace(/=/g, "");
-    return `HKEY_CURRENT_USER/SOFTWARE/AmerOS/Applications/HtmlReader/AllowLists/${encodedPath}`;
+    return `AllowLists/${encodedPath}`;
   };
 
   useAppMessage((message) => {
     if (message.type === 'LAUNCH_ARGS' && message.args.filePath) {
       setFilePath(message.args.filePath);
+      return true;
     }
+    return false;
   });
 
   const handleOpenFile = async () => {

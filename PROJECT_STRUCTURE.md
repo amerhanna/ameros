@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-06-10.after-7dcdcba.docs-update-baseline-version-and-document-new-useappmessage-hook-for-ipc-support
-> Baseline Commit: 7dcdcba
-> Baseline Summary: docs: update baseline version and document new useAppMessage hook for IPC support
-> Generated At (UTC): 2026-06-10T18:58:11Z
+> Doc Version: 2026-06-11.after-79a4d0d.not-too-much-files
+> Baseline Commit: 79a4d0d
+> Baseline Summary: not too much files
+> Generated At (UTC): 2026-06-11T20:44:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -20,7 +20,7 @@ This document is versioned against a git commit summary so future agents can jud
 ## Directory Overview
 
 - [**`app/`**](file:///c:/dev/personal/ameros/app): Next.js App Router root.
-    - `layout.tsx`: Root layout, includes the `ClipboardProvider`, `RegistryProvider`, and global theming.
+    - `layout.tsx`: Root layout, includes the `ClipboardProvider` and global theming.
     - `page.tsx`: Entry point, renders the `WindowManagerDemo`.
 - [**`Applications/`**](file:///c:/dev/personal/ameros/Applications): Contains individual OS applications.
     - `Calculator/`: Basic calculator application.
@@ -55,13 +55,12 @@ This document is versioned against a git commit summary so future agents can jud
 - [**`lib/`**](file:///c:/dev/personal/ameros/lib): Core OS-level services. **Note: ESLint restricts direct userland application logic from importing kernel-level APIs here directly.**
     - `vfs.ts`: **Virtual File System**. Handles IndexedDB storage and external `FileSystemHandle` mounts. Utilizes dedicated `VFSNode` structures (`DriveNode`, `FolderNode`, `FileNode`) and supports complete tree/change propagation across the OS.
     - `database.ts`: **OS Database Layer**. Powered by alaSQL, provides a per-app schema mapped and synced to `C:/System/AppData` via the VFS.
-    - `registry.ts`: Windows registry emulation storing hierarchical `RegistryNode` structures to persist OS-level settings. Made available synchronously via `registry-provider.tsx`.
+    - `registry.ts`: Windows registry emulation storing hierarchical `RegistryNode` structures to persist OS-level settings.
     - `boot-sequencer.ts`: Orchestrates system startup steps (e.g., creating system folders, initializing Registry features, VFS seeding).
     - `window-store.ts`: State management for window positions, focus, and Z-index (uses a custom subscription model).
     - `clipboard.tsx`: System-wide clipboard for file operations (Copy/Cut/Paste).
     - `app-service.ts`: Manages system-wide application installation, registration, and Start Menu entries via the Registry.
     - `file-service.ts`: Handles file-to-application associations and icon resolution using the system Registry.
-    - `registry-provider.tsx`: React provider for synchronous access to the registry across the application.
     - `bundled-apps.ts`: Defines system bundled applications registry.
     - `default-registry.json`: The default system registry state used during initialization.
     - `utils.ts`: Utility functions for the OS.
@@ -70,6 +69,7 @@ This document is versioned against a git commit summary so future agents can jud
     - `useSystemDialogs.tsx`: Manage system dialogs (Open/Save/Properties).
     - `useMessageBox.tsx`: Global message box interface (alert/confirm/error/prompt).
     - `useDatabase.ts`: Allows active applications to safely and simply execute SQL queries through `lib/database.ts`, enforcing bounds dynamically using the caller's WindowContext `appId`.
+    - `useRegistry.ts`: Enables active applications to securely read/write config settings to their own isolated registry hive (`HKEY_CURRENT_USER/SOFTWARE/AmerOS/Applications/${appId}`), enforcing boundaries dynamically using the caller's `appId` via `WindowContext`.
     - `useWindowEngine.ts`, `useWindowActions.ts`, `useGetWindowState.ts`: Core abstractions to operate the Window manager from child contexts or isolated apps.
     - `useStartMenu.ts`, `useDesktopContextMenu.ts`: Support for start menu management, and global right-click behaviors.
     - `useAppMessage.ts`: Hook for applications to receive IPC messages (like file open requests) to support single-instance behavior.
@@ -92,6 +92,8 @@ Located in `lib/registry.ts`, AmerOS utilizes a hierarchical registry structure 
 
 Additionally, applications can leverage robust relational storage via the OS Database Layer (`lib/database.ts`). It provides an auto-persisting, file-backed SQL execution system. Active applications should utilize the `useDatabase()` hook entirely, which dynamically determines the caller's db namespace scope (`appId`), effectively maintaining isolation and safety.
 
+Similarly, applications can interact with the Registry via `useRegistry()` hook which limits their reading/writing capabilities to their application namespace scope (`HKEY_CURRENT_USER/SOFTWARE/AmerOS/Applications/${appId}`), guaranteeing isolation.
+
 ### 4. Application Registry
 Apps are registered in `WindowManagerDemo.tsx` or using the Start Menu / registry services with metadata like icons, initial dimensions, resizability, and lifecycle hooks (e.g., `beforeClose`). Start Menu integrations can also contain deeply nested categorizations (e.g., grouping system utilities inside a submenu item). Single-instance messaging is also supported via `useAppMessage.ts`.
 
@@ -106,7 +108,7 @@ A global `boot-sequencer.ts` ensures proper sequential OS initialization. Servic
 3. **Add to Start Menu**: Include it inside the Registry's start menu entries.
 
 ### Adding System Data
-If the data mimics a configuration setting or aesthetic preference, utilize `lib/registry.ts`. For complex relational layouts, local tables, or significant app state—use the SQL Database via `useDatabase()`. For generic non-relational files or assets, interface with `lib/vfs.ts`. All of these engines broadcast events enabling fully reactive system APIs.
+If the data mimics a configuration setting or aesthetic preference, utilize `lib/registry.ts` (or `useRegistry` inside application components). For complex relational layouts, local tables, or significant app state—use the SQL Database via `useDatabase()`. For generic non-relational files or assets, interface with `lib/vfs.ts`. All of these engines broadcast events enabling fully reactive system APIs.
 
 ---
 *This document is intended for AI agents to quickly understand the architecture of AmerOS.*
