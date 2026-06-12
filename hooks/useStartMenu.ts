@@ -23,6 +23,9 @@ export function useStartMenu(additionalStartMenuItems: StartMenuItem[] = []) {
 
       const itemPath = `${path}/${id}`;
       const values = await registry.getValues(itemPath);
+      if (values.hidden === true || values.hidden === "true") {
+        continue;
+      }
       const type = values.type as string;
 
       if (type === 'submenu') {
