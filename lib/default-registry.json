@@ -422,7 +422,7 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "HtmlReader", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "DemoApp", "CommonDialogDemo", "TestClose", "separator", "Settings", "Utilities", "separator", "ShutDown"]
+                    "content": ["Programs", "HtmlReader", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "separator", "Settings", "Utilities", "system_demo", "separator", "ShutDown"]
                   },
                   {
                     "name": "Programs",
@@ -536,27 +536,37 @@
                     ]
                   },
                   {
-                    "name": "DemoApp",
+                    "name": "system_demo",
                     "type": "key",
                     "content": [
-                      { "name": "label", "type": "string", "content": "Demo Application" },
-                      { "name": "component", "type": "string", "content": "DemoApp" }
-                    ]
-                  },
-                  {
-                    "name": "CommonDialogDemo",
-                    "type": "key",
-                    "content": [
-                      { "name": "label", "type": "string", "content": "Common Dialog Demo" },
-                      { "name": "component", "type": "string", "content": "CommonDialogDemo" }
-                    ]
-                  },
-                  {
-                    "name": "TestClose",
-                    "type": "key",
-                    "content": [
-                      { "name": "label", "type": "string", "content": "Test Close" },
-                      { "name": "component", "type": "string", "content": "TestCloseApp" }
+                      { "name": "type", "type": "string", "content": "submenu" },
+                      { "name": "label", "type": "string", "content": "System Demo" },
+                      { "name": "icon", "type": "string", "content": "📂" },
+                      { "name": "default", "type": "object", "content": ["TestClose", "CommonDialogDemo", "DemoApp"] },
+                      {
+                        "name": "TestClose",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "Test Close" },
+                          { "name": "component", "type": "string", "content": "TestCloseApp" }
+                        ]
+                      },
+                      {
+                        "name": "CommonDialogDemo",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "Common Dialog Demo" },
+                          { "name": "component", "type": "string", "content": "CommonDialogDemo" }
+                        ]
+                      },
+                      {
+                        "name": "DemoApp",
+                        "type": "key",
+                        "content": [
+                          { "name": "label", "type": "string", "content": "Demo Application" },
+                          { "name": "component", "type": "string", "content": "DemoApp" }
+                        ]
+                      }
                     ]
                   },
                   {
