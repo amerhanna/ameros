@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 
 import { ClipboardProvider } from "@/lib/clipboard";
 import { Toaster } from '@/components/ui/sonner';
+import OSProvider from "@/components/System/OSProvider";
 
 export default function RootLayout({
   children,
@@ -26,7 +27,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <ClipboardProvider>
-          {children}
+          <OSProvider>
+            {children}
+          </OSProvider>
           <Toaster />
           <Analytics />
         </ClipboardProvider>

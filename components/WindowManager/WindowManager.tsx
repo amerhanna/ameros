@@ -6,7 +6,7 @@ import Window from "@/components/WindowManager/Window";
 import Taskbar from "@/components/WindowManager/Taskbar";
 import StartMenu from "@/components/WindowManager/StartMenu";
 import WindowContextMenu from "@/components/WindowManager/WindowContextMenu";
-import SplashScreen from "@/components/WindowManager/SplashScreen";
+
 import { SystemActionsContext } from "@/components/WindowManager/WindowContext";
 import type { StartMenuItem, ApplicationRegistry } from "@/types/window";
 import { useWindowEngine } from "@/hooks/useWindowEngine";
@@ -33,16 +33,10 @@ function DesktopContent({
   children, 
   applicationRegistry, 
   engine,
-  mounted,
-  isSplashFinished,
-  setIsSplashFinished,
+  // mounted,
   additionalStartMenuItems
 }: WindowManagerProps & { 
   engine: ReturnType<typeof useWindowEngine>,
-  mounted: boolean,
-  isSplashFinished: boolean,
-  setIsSplashFinished: (v: boolean) => void,
-  additionalStartMenuItems: StartMenuItem[]
 }) {
   const {
     windows,
@@ -211,9 +205,6 @@ function DesktopContent({
 
       {/* Custom Content */}
       {children}
-
-      {/* Splash Screen Overlay */}
-      {(!mounted || !isSplashFinished) && <SplashScreen onFinish={() => setIsSplashFinished(true)} minDuration={1500} />}
     </div>
   );
 }
@@ -230,7 +221,7 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
 
   useEffect(() => {
     let isMounted = true;
-
+    
     appService.waitUntilReady()
       .then(() => {
         if (!isMounted) return;
@@ -252,7 +243,6 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
   }), [bundledApps, applicationRegistry]);
 
   const engine = useWindowEngine(mergedApplicationRegistry);
-  const [isSplashFinished, setIsSplashFinished] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -322,9 +312,7 @@ export default function WindowManager({ children, applicationRegistry = {}, addi
       <DesktopContent 
         applicationRegistry={mergedApplicationRegistry} 
         engine={engine}
-        mounted={engine.mounted}
-        isSplashFinished={isSplashFinished}
-        setIsSplashFinished={setIsSplashFinished}
+        // mounted={engine.mounted}
         additionalStartMenuItems={additionalStartMenuItems}
       >
         {children}
