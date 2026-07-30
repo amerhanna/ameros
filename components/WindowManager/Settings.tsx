@@ -582,7 +582,7 @@ export default function Settings() {
   return (
     <div className="p-6 flex flex-col h-full bg-gray-50 overflow-auto">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Settings</h2>
-      
+
       <Tabs defaultValue="appearance" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-8">
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
@@ -590,7 +590,7 @@ export default function Settings() {
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="appearance" className="space-y-6">
           <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="space-y-0.5">
@@ -604,57 +604,59 @@ export default function Settings() {
 
           <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="space-y-0.5">
-              <Label className="text-base font-semibold">Dark Mode</Label>
+              <Label className="text-base font-semibold">
+                Dark Mode <span className="text-[8px] align-text-top text-gray-500">Coming soon</span>
+              </Label>
               <p className="text-sm text-gray-500">Enable dark theme across the system.</p>
             </div>
             <Switch />
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="space-y-0.5">
-              <Label className="text-base font-semibold">Transparency Effects</Label>
+              <Label className="text-base font-semibold">
+                Transparency Effects <span className="text-[8px] align-text-top text-gray-500">Coming soon</span>
+              </Label>
               <p className="text-sm text-gray-500">Make taskbar and windows slightly transparent.</p>
             </div>
             <Switch defaultChecked />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-base font-semibold">Accent Color</Label>
+            <Label className="text-base font-semibold">
+              Accent Color <span className="text-[8px] align-text-top text-gray-500">Coming soon</span>
+            </Label>
             <div className="flex gap-2">
-              {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'].map(color => (
-                <button 
-                  key={color} 
-                  className="w-8 h-8 rounded-full border-2 border-white shadow-sm" 
-                  style={{ backgroundColor: color }}
-                />
+              {["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"].map((color) => (
+                <button key={color} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
               ))}
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="startmenu" className="space-y-0">
-          <div className="flex gap-4" style={{ height: '420px' }}>
+          <div className="flex gap-4" style={{ height: "420px" }}>
             {/* Left: Tree panel */}
-            <div className="flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden" style={{ width: '55%' }}>
+            <div className="flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden" style={{ width: "55%" }}>
               <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
                 <span className="text-sm font-semibold text-gray-700">Start Menu Items</span>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => handleAddNewItem('item')}
+                    onClick={() => handleAddNewItem("item")}
                     className="p-1.5 rounded hover:bg-blue-50 text-blue-600 transition-colors"
                     title="Add App"
                   >
                     <PlusCircle className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleAddNewItem('submenu')}
+                    onClick={() => handleAddNewItem("submenu")}
                     className="p-1.5 rounded hover:bg-yellow-50 text-yellow-600 transition-colors"
                     title="Add Submenu"
                   >
                     <FolderPlus className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleAddNewItem('separator')}
+                    onClick={() => handleAddNewItem("separator")}
                     className="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors"
                     title="Add Separator"
                   >
@@ -678,7 +680,7 @@ export default function Settings() {
                   <HelpCircle className="w-8 h-8 opacity-40" />
                   <p className="text-sm">Select an item to edit</p>
                 </div>
-              ) : selectedItem.type === 'separator' ? (
+              ) : selectedItem.type === "separator" ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
                   <div className="h-[2px] bg-gray-300 w-24 rounded" />
                   <p className="text-sm font-medium text-gray-500">Separator</p>
@@ -694,18 +696,20 @@ export default function Settings() {
               ) : (
                 <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
-                    <span className="text-sm font-semibold text-gray-700 truncate">
-                      {selectedItem.label || selectedItem.id}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ml-2 ${
-                      selectedItem.type === 'submenu' ? 'bg-yellow-100 text-yellow-700' :
-                      selectedItem.type === 'action' ? 'bg-purple-100 text-purple-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
+                    <span className="text-sm font-semibold text-gray-700 truncate">{selectedItem.label || selectedItem.id}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ml-2 ${
+                        selectedItem.type === "submenu"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : selectedItem.type === "action"
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
                       {selectedItem.type}
                     </span>
                   </div>
-                  
+
                   <div className="overflow-y-auto flex-1 p-3 space-y-3">
                     {/* Label */}
                     <div>
@@ -731,7 +735,7 @@ export default function Settings() {
                     </div>
 
                     {/* Item-specific fields */}
-                    {selectedItem.type === 'item' && (
+                    {selectedItem.type === "item" && (
                       <>
                         <div>
                           <label className="block text-xs font-semibold text-gray-600 mb-1">Component</label>
@@ -750,13 +754,13 @@ export default function Settings() {
                             onChange={(e) => setEditLaunchArgs(e.target.value)}
                             rows={3}
                             className="w-full px-2.5 py-1.5 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none"
-                            placeholder='{}'
+                            placeholder="{}"
                           />
                         </div>
                       </>
                     )}
 
-                    {selectedItem.type === 'action' && (
+                    {selectedItem.type === "action" && (
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Action ID</label>
                         <input
@@ -779,7 +783,9 @@ export default function Settings() {
                           className="flex-1 px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
                         >
                           {submenuList.map((s) => (
-                            <option key={s.path} value={s.path}>{s.label}</option>
+                            <option key={s.path} value={s.path}>
+                              {s.label}
+                            </option>
                           ))}
                         </select>
                         <button
@@ -798,13 +804,11 @@ export default function Settings() {
                       <button
                         onClick={() => handleToggleVisibility(selectedItem)}
                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          selectedItem.hidden
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                          selectedItem.hidden ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-green-50 text-green-600 hover:bg-green-100"
                         }`}
                       >
                         {selectedItem.hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        {selectedItem.hidden ? 'Hidden' : 'Visible'}
+                        {selectedItem.hidden ? "Hidden" : "Visible"}
                       </button>
                     </div>
                   </div>
@@ -831,7 +835,7 @@ export default function Settings() {
             </div>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="system" className="space-y-5">
           {/* Registry Management */}
           <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -840,50 +844,20 @@ export default function Settings() {
               Export, import, or reset the system registry (settings, preferences, and app configurations).
             </p>
             <div className="flex flex-wrap gap-2">
-              <ActionButton
-                icon={Download}
-                label="Export Registry"
-                loading={loading === "exportReg"}
-                onClick={handleExportRegistry}
-              />
-              <ActionButton
-                icon={Upload}
-                label="Import Registry"
-                loading={loading === "importReg"}
-                onClick={handleImportRegistry}
-              />
-              <ActionButton
-                icon={RotateCcw}
-                label="Reset Registry"
-                variant="destructive"
-                onClick={handleResetRegistry}
-              />
+              <ActionButton icon={Download} label="Export Registry" loading={loading === "exportReg"} onClick={handleExportRegistry} />
+              <ActionButton icon={Upload} label="Import Registry" loading={loading === "importReg"} onClick={handleImportRegistry} />
+              <ActionButton icon={RotateCcw} label="Reset Registry" variant="destructive" onClick={handleResetRegistry} />
             </div>
           </div>
 
           {/* Internal Storage Management */}
           <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-base font-semibold mb-1">Internal Storage</h3>
-              Export, import, or reset files on the root filesystem. The registry file is excluded from these operations.
+            Export, import, or reset files on the root filesystem. The registry file is excluded from these operations.
             <div className="flex flex-wrap gap-2">
-              <ActionButton
-                icon={Download}
-                label="Export Storage"
-                loading={loading === "exportStorage"}
-                onClick={handleExportStorage}
-              />
-              <ActionButton
-                icon={Upload}
-                label="Import Storage"
-                loading={loading === "importStorage"}
-                onClick={handleImportStorage}
-              />
-              <ActionButton
-                icon={RotateCcw}
-                label="Reset Storage"
-                variant="destructive"
-                onClick={handleResetStorage}
-              />
+              <ActionButton icon={Download} label="Export Storage" loading={loading === "exportStorage"} onClick={handleExportStorage} />
+              <ActionButton icon={Upload} label="Import Storage" loading={loading === "importStorage"} onClick={handleImportStorage} />
+              <ActionButton icon={RotateCcw} label="Reset Storage" variant="destructive" onClick={handleResetStorage} />
             </div>
           </div>
 
@@ -893,15 +867,10 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               Permanently erase all data — registry, files, and storage. This action cannot be undone.
             </p>
-            <ActionButton
-              icon={Trash2}
-              label="Reset Everything"
-              variant="destructive"
-              onClick={handleResetEverything}
-            />
+            <ActionButton icon={Trash2} label="Reset Everything" variant="destructive" onClick={handleResetEverything} />
           </div>
         </TabsContent>
-        
+
         <TabsContent value="about" className="space-y-4">
           <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm text-center">
             <div className="text-4xl mb-4 text-blue-600 font-bold italic">AmerOS</div>
@@ -916,5 +885,5 @@ export default function Settings() {
 
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
-  )
+  );
 }
