@@ -128,10 +128,12 @@ export function useWindowDragResize({
       setDragging(false);
       setResizing(false);
       setResizeDir(null);
+      document.body.classList.remove('window-interacting');
       flushPersistence();
     };
 
     if (dragging || resizing) {
+      document.body.classList.add('window-interacting');
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }

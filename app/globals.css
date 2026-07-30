@@ -90,3 +90,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Disable pointer events on all iframes during window drag/resize
+   to prevent them from stealing mouse events */
+body.window-interacting iframe {
+  pointer-events: none !important;
+}
