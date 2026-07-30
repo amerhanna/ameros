@@ -2,10 +2,10 @@
 
 AmerOS is a React-based (Next.js) web application that simulates a desktop operating system. It features a window manager, a virtual file system (VFS), an OS-level database service, a system registry, and a suite of "Applications".
 
-> Doc Version: 2026-06-11.after-095b20b.add-use-registry-hook
+> Doc Version: 2026-07-29.after-095b20b.add-welcome-app
 > Baseline Commit: 095b20b
-> Baseline Summary: add use registry hook
-> Generated At (UTC): 2026-06-11T20:45:00Z
+> Baseline Summary: add welcome app
+> Generated At (UTC): 2026-07-29T21:42:00Z
 > Changes Since Baseline: 0 (up to date at generation time)
 
 ## Documentation Versioning
@@ -41,6 +41,7 @@ This document is versioned against a git commit summary so future agents can jud
     - `TextEditor/`: Simple text editing app.
     - `Vectorpea/`: Vector graphics editor leveraging Vectorpea via an iframe with bidirectional VFS integration.
     - `WebApp/`: Web view frame container.
+    - `Welcome/`: Interactive welcome guide explaining AmerOS core systems (Window Manager, VFS, Database, Registry, Boot Sequencer, IPC) and providing shortcuts to OS utilities and system demos.
 - [**`components/`**](file:///c:/dev/personal/ameros/components): System-wide UI components.
     - `WindowManager/`: Core logic for `Window`, `WindowManager`, `Taskbar`, `StartMenu`, `MenuBar` and `ContextMenu`. Includes nested submenus support.
     - `SystemDialogs/`: Standard OS dialogs (e.g., `SaveDialog`, `OpenDialog`, `PropertiesDialog`).

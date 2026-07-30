@@ -388,6 +388,9 @@
                     "type": "object",
                     "content": [
                       {
+                        "component": "WelcomeApp"
+                      },
+                      {
                         "component": "PDFViewer",
                         "launchArgs": {
                           "filePath": "/home/Amer Hanna Dev CV.pdf"
@@ -422,7 +425,16 @@
                   {
                     "name": "default",
                     "type": "object",
-                    "content": ["Programs", "HtmlReader", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "separator", "Settings", "Utilities", "system_demo", "separator", "ShutDown"]
+                    "content": ["WelcomeApp", "Programs", "HtmlReader", "Notes", "TextEditor", "PDFViewer", "DocsViewer", "Calculator", "FileExplorer", "MusicPlayer", "separator", "Settings", "Utilities", "system_demo", "separator", "ShutDown"]
+                  },
+                  {
+                    "name": "WelcomeApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "label", "type": "string", "content": "Welcome & Tour" },
+                      { "name": "component", "type": "string", "content": "WelcomeApp" },
+                      { "name": "icon", "type": "string", "content": "🚀" }
+                    ]
                   },
                   {
                     "name": "Programs",
@@ -627,6 +639,19 @@
                 "name": "Applications",
                 "type": "key",
                 "content": [
+                  {
+                    "name": "WelcomeApp",
+                    "type": "key",
+                    "content": [
+                      { "name": "icon", "type": "string", "content": "🚀" },
+                      { "name": "width", "type": "number", "content": 780 },
+                      { "name": "height", "type": "number", "content": 560 },
+                      { "name": "resizable", "type": "boolean", "content": true },
+                      { "name": "minWidth", "type": "number", "content": 600 },
+                      { "name": "minHeight", "type": "number", "content": 450 },
+                      { "name": "maximizable", "type": "boolean", "content": true }
+                    ]
+                  },
                   {
                     "name": "TextEditor",
                     "type": "key",

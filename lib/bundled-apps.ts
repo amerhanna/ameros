@@ -21,12 +21,14 @@ import Vectorpea from '@/Applications/Vectorpea/Vectorpea';
 import DocsViewer from '@/Applications/DocsViewer/DocsViewer';
 import MusicPlayer from '@/Applications/MusicPlayer/MusicPlayer';
 import HtmlReader from '@/Applications/HtmlReader/HtmlReader';
+import WelcomeApp from '@/Applications/Welcome/WelcomeApp';
 
 /**
  * Map of bundled application component names to their React components.
  * These are the core applications shipped with AmerOS.
  */
 export const bundledComponents: Record<string, React.ComponentType<any>> = {
+  WelcomeApp,
   TextEditor,
   Calculator,
   FileExplorer,
