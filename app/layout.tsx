@@ -25,6 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+    <head>
+    <meta name="google-site-verification" content="gVr2hebXws8kKvnwLSwhBHy8Egmzd9IhgO9GfCritCQ" />
+    </head>
       <body className={`font-sans antialiased`}>
         <ClipboardProvider>
           <OSProvider>
