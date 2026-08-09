@@ -28,13 +28,13 @@ export default function RootLayout({
     <html lang="en">
     <head>
     <meta name="google-site-verification" content="gVr2hebXws8kKvnwLSwhBHy8Egmzd9IhgO9GfCritCQ" />
-    <Script src="https://www.googletagmanager.com/gtag/js?id=G-QCBRK64W0J" strategy="afterInteractive" />
+    <Script src="https://www.googletagmanager.com/gtag/js?id=G-G9T9H62RKD" strategy="afterInteractive" />
     <Script id="google-analytics" strategy="afterInteractive">
       {`
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-        gtag('config', 'G-QCBRK64W0J');
+        gtag('config', 'G-G9T9H62RKD');
       `}
     </Script>
     </head>
